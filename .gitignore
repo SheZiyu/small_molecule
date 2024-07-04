@@ -96,5 +96,6 @@ output_images_debug_forward
 output_images_gnn_solver1
 output_images_gnn_solver1_old
 data
+lightning_logs
 
 
