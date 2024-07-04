@@ -87,3 +87,14 @@ db.sqlite3-journal
 
 # Configuration files that contain sensitive information or user-specific settings
 #config/*.yaml
+
+
+#own directories
+output
+output_images_debug_backward
+output_images_debug_forward
+output_images_gnn_solver1
+output_images_gnn_solver1_old
+data
+
+
