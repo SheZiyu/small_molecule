@@ -25,7 +25,7 @@ from matplotlib import cm
 import MDAnalysis as mda
 import MDAnalysis.analysis.align as align
 
-from small_sys_gnn.data.load import *
+# from small_sys_gnn.data.load import *
 
 def parse_toml_file(filename):
     with open(filename, 'r') as f:

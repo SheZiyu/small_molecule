@@ -12,10 +12,16 @@ from mpl_toolkits.mplot3d import Axes3D
 import torch
 from torch_geometric.data.batch import *
 
+import MDAnalysis as mda
 from MDAnalysis.analysis import rms, align
 
-from small_sys_gnn.model.solver1_gnn_lightning import *
-from small_sys_gnn.data.data_test import *
+from torch_geometric.nn.pool import radius_graph
+
+# from small_sys_gnn.model.solver1_gnn_lightning import *
+# from small_sys_gnn.data.data_test import *
+from prepocessing.preprocessing import parse_toml_file
+from prepocessing.data_test import TrajectoriesDataset_Efficient, generate_test_dataset, calculate_rmsf
+from model.solver1_gnn_lightning import LitModel
 
 def process_folder(folder, folder_path):
     pdb_files = [file for file in os.listdir(folder_path) if file == 'gt_1a10A.pdb']

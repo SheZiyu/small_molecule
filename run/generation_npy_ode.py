@@ -1,5 +1,7 @@
+import os
 import time
 import subprocess
+import zipfile
 
 import numpy as np
 # import mpld3
@@ -9,10 +11,14 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 import torch
-from torch_geometric.data.batch import *
+# from torch_geometric.data.batch import *
+from torch_geometric.nn.pool import radius_graph
 
-from small_sys_gnn.model.solver1_gnn_lightning import *
-from small_sys_gnn.data.data_test import *
+# from small_sys_gnn.model.solver1_gnn_lightning import *
+# from small_sys_gnn.data.data_test import *
+from prepocessing.preprocessing import parse_toml_file
+from prepocessing.data_test import TrajectoriesDataset_Efficient, generate_test_dataset
+from model.solver1_gnn_lightning import LitModel
 
 def augment_edge(data):
     # Extract edge indices i, j from the data

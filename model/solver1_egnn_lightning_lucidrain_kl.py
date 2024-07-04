@@ -25,8 +25,8 @@ from torch.optim import lr_scheduler
 from torch.cuda.amp import autocast
 from torch.nn.parallel import DataParallel
 
-from small_sys_gnn.model.base import *
-from small_sys_gnn.model.egnn import *
+# from small_sys_gnn.model.base import *
+# from small_sys_gnn.model.egnn import *
 
 def extract_pdb_from_zip(zip_folder, target_name, output_folder):
     """Extract PDB file from a specific ZIP file."""

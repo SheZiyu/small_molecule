@@ -25,8 +25,8 @@ except:
     OptTensor = object
     Tensor = object
 
-from small_sys_gnn.model.base import *
-from small_sys_gnn.model.egnn_pytorch import *
+# from small_sys_gnn.model.base import *
+# from small_sys_gnn.model.egnn_pytorch import *
 
 
 # global linear attention

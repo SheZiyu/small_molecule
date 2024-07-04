@@ -1,5 +1,7 @@
+import os
 import time
 import subprocess
+import zipfile
 
 import numpy as np
 # import mpld3
@@ -10,9 +12,13 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import torch
 from torch_geometric.data.batch import *
+from torch_geometric.nn.pool import radius_graph
 
-from small_sys_gnn.model.solver1_gnn_lightning import *
-from small_sys_gnn.data.data_test import *
+# from small_sys_gnn.model.solver1_gnn_lightning import *
+# from small_sys_gnn.data.data_test import *
+from prepocessing.preprocessing import parse_toml_file
+from prepocessing.data_test import TrajectoriesDataset_Efficient, generate_test_dataset
+from model.solver1_gnn_lightning import LitModel
 
 def radius_graph_custom(pos, r_min, r_max, batch) -> torch.Tensor:
     """Creates edges based on distances between points belonging to the same graph in the batch

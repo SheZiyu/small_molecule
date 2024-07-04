@@ -5,6 +5,8 @@ from lightning.pytorch.callbacks import TQDMProgressBar
 from lightning.pytorch.loggers import TensorBoardLogger
 from torch_ema import ExponentialMovingAverage
 
+import os
+import zipfile
 import math
 import copy
 from pathlib import Path
@@ -18,13 +20,19 @@ import subprocess
 from einops import rearrange, reduce, repeat
 from einops.layers.torch import Rearrange
 
+import torch
+import torch.nn as nn
 import torch.optim as optim
 from lightning.pytorch.utilities.types import TRAIN_DATALOADERS, EVAL_DATALOADERS
 from torch.optim import lr_scheduler
 from torch.cuda.amp import autocast
 from torch.nn.parallel import DataParallel
+from torch_geometric.loader import DataLoader
 
-from small_sys_gnn.model.base import *
+from prepocessing.preprocessing import parse_toml_file
+from prepocessing.data import TrajectoriesDataset_Efficient
+from model.base import DynamicsGNN
+# from small_sys_gnn.model.base import *
 
 def extract_pdb_from_zip(zip_folder, target_name, output_folder):
     """Extract PDB file from a specific ZIP file."""
@@ -608,8 +616,8 @@ if __name__ == "__main__":
     # print(sys.getsizeof(val_loader))
 
     datamodule = LitData(config)
-    # model = LitModel(config)
-    model = LitModel.load_from_checkpoint('/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output/solver1_gnn_test_beta_8_1-v33.ckpt', config=config)
+    model = LitModel(config)
+    # model = LitModel.load_from_checkpoint('/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output/solver1_gnn_test_beta_8_1-v33.ckpt', config=config)
 
     print(model.model.time_embedding.B)
     torch.manual_seed(42)
@@ -635,7 +643,7 @@ if __name__ == "__main__":
 
     # Initialize Trainer with early stopping callback and model checkpoint callback
     trainer = L.Trainer(
-        devices=2,
+        devices=1,
         accelerator="cuda",
         max_epochs=config['num_epochs'],
         callbacks=[early_stop_callback, checkpoint_callback],

@@ -1,0 +1,29 @@
+config:
+  batch_size: 12
+  cutoff: 1.5
+  data_dir: /home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys
+  decay: 0.995
+  device: cpu
+  device0: 0
+  device1: 1
+  device2: 2
+  device3: 3
+  directory_path: /home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys
+  edge_dim: 1
+  learning_rate: 0.0001
+  node_dim: 17
+  num_bins: 20
+  num_epochs: 300
+  num_frames_to_process: 10000
+  num_splits: 3
+  num_workers: 2
+  patience: 30
+  pin_memory: true
+  scale: 3
+  scale_var: 2
+  seed:
+  - 42
+  - 43
+  - 44
+  train_size: 0.7
+  vector_dim: 3

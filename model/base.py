@@ -10,7 +10,9 @@ from torch_geometric.data import Data, Dataset
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import scatter
 
-from small_sys_gnn.data.data import *
+# from small_sys_gnn.data.data import *
+from prepocessing.preprocessing import parse_toml_file
+from prepocessing.data import generate_train_dataset, data_augmentation
 
 class MLP(nn.Module):
     '''
@@ -482,7 +484,7 @@ if __name__ == '__main__':
     num_workers = config['num_workers']
     num_frames_to_process = config['num_frames_to_process']
     # ProteinAnalysis(directory_path, num_frames_to_process).preprocess_coordinate_onehot()
-    TrajsDataset = TrajectoriesDataset(
+    TrajsDataset = TrajsDataset(
         False,
         directory_path,
         num_frames_to_process,
