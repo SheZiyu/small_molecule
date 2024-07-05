@@ -22,6 +22,7 @@ from einops.layers.torch import Rearrange
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from lightning.pytorch.utilities.types import TRAIN_DATALOADERS, EVAL_DATALOADERS
 from torch.optim import lr_scheduler
@@ -29,55 +30,11 @@ from torch.cuda.amp import autocast
 from torch.nn.parallel import DataParallel
 from torch_geometric.loader import DataLoader
 
+from utils.auxiliary import write_combined_pdb
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data import TrajectoriesDataset_Efficient
 from model.base import DynamicsGNN
-# from small_sys_gnn.model.base import *
 
-def extract_pdb_from_zip(zip_folder, target_name, output_folder):
-    """Extract PDB file from a specific ZIP file."""
-    for zip_file_name in os.listdir(zip_folder):
-        if zip_file_name.endswith('.zip'):
-            if target_name in zip_file_name:
-                zip_file_path = os.path.join(zip_folder, zip_file_name)
-                with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-                    for file_name in zip_ref.namelist():
-                        if file_name.endswith('.pdb'):
-                            zip_ref.extract(file_name, output_folder)
-                            return os.path.join(output_folder, file_name)
-    return None
-
-def write_combined_pdb(original_pdb, new_coordinates, output_file):
-    """Write the combined PDB file with new coordinates."""
-    print(f"Writing PDB file: {output_file}")
-    print(f"Number of new coordinates: {len(new_coordinates)}")
-    with open(original_pdb, 'r') as original_file, open(output_file, 'w') as combined_file:
-        atom_idx = 0
-        for line in original_file:
-            if line.startswith('ATOM'):
-                atom_name = line[12:16].strip()
-                resname = line[17:20].strip()
-
-                # # Exclude hydrogen atoms
-                # if atom_name.startswith('H'):
-                #     combined_file.write(line)
-                #     continue
-
-                # Handle the new coordinates for non-hydrogen atoms
-                if atom_idx < len(new_coordinates):
-                    new_x, new_y, new_z = new_coordinates[atom_idx]
-                    atom_idx += 1
-                    new_line = f"{line[:30]}{new_x:8.3f}{new_y:8.3f}{new_z:8.3f}{line[54:]}"
-                    combined_file.write(new_line)
-                else:
-                    combined_file.write(line)
-
-            elif line.startswith('ATOM') and resname == "UNL":
-                combined_file.write(line)
-            else:
-                combined_file.write(line)
-
-    print(f"Finished writing PDB file: {output_file}")
 
 class DDPM(nn.Module):
     """
@@ -119,21 +76,6 @@ class DDPM(nn.Module):
         self.lambda_min = self.lambda_t(torch.tensor(self.t_min)).item()
         self.lambda_max = self.lambda_t(torch.tensor(self.t_max)).item()
 
-    def ve_noise(self, x, t, degree=0.01):
-        """
-        Applies forward noise to the input tensor x at time t, simulating the diffusion process.
-
-        Parameters:
-        - x (Tensor): The input tensor.
-        - t (Tensor): The time step tensor.
-
-        Returns:
-        - Tuple[Tensor, Tensor]: The noised tensor and the generated noise tensor.
-        """
-        eps = degree * torch.randn_like(x)  # Generates random noise.
-        x_t = x + self.sigma_t(t) * eps  # Applies the diffusion process.
-        return x_t, eps
-
     def forward_noise(self, x, t):
         """
         Applies forward noise to the input tensor x at time t, simulating the diffusion process.
@@ -148,55 +90,6 @@ class DDPM(nn.Module):
         eps = torch.randn_like(x)  # Generates random noise.
         x_t = self.alpha_t(t) * x + self.sigma_t(t) * eps  # Applies the diffusion process.
         return x_t, eps
-
-    def reverse_t(self, x_T, M=30):
-        """
-        Performs the reverse denoising process, reconstructing the data from its noised state.
-
-        Parameters:
-        - x_T (Tensor): The tensor at the final time step T.
-        - noise_net (callable): The noise network function, predicting noise to be subtracted.
-        - solver (callable): The solver function for the reverse process, optimizing denoising steps.
-        - M (int): The number of steps in the reverse process. Default is 20.
-
-        Returns:
-        - Tensor: The stack of denoised tensors at each step.
-        """
-        # Compute λ values evenly spaced between the max and min, dictating the denoising schedule.
-        lambdas = torch.linspace(self.lambda_max, self.lambda_min, M + 1, device=x_T.device)#.view(-1, 1, 1)
-        # print(lambdas)
-        t = self.t_lambda(lambdas)  # Convert λ values back to time steps for denoising.
-        # print(t)
-        return t
-
-    def reverse_ode(self, x_T, noise_net, M=30, return_all=False, **kwargs):
-        """
-        Performs the reverse denoising process, reconstructing the data from its noised state.
-
-        Parameters:
-        - x_T (Tensor): The tensor at the final time step T.
-        - noise_net (callable): The noise network function, predicting noise to be subtracted.
-        - solver (callable): The solver function for the reverse process, optimizing denoising steps.
-        - M (int): The number of steps in the reverse process. Default is 20.
-
-        Returns:
-        - Tensor: The stack of denoised tensors at each step.
-        """
-        # Compute λ values evenly spaced between the max and min, dictating the denoising schedule.
-        lambdas = torch.linspace(self.lambda_max, self.lambda_min, M + 1, device=x_T.device)#.view(-1, 1, 1)
-        # print(lambdas)
-        t = self.t_lambda(lambdas)  # Convert λ values back to time steps for denoising.
-        # print(t)
-        x = x_T
-        xs = []  # Stores the denoised states at each step.
-        for i in range(len(t)):
-            x = noise_net(x=x, t=t[i][None], **kwargs)[0] # Apply the reverse denoising solver.
-            # print(x)
-            xs.append(x.clone())
-        if return_all:
-            return torch.stack(xs)
-        else:
-            return x
 
     def reverse_denoise(self, x_T, noise_net, solver, order=1, M=30, return_all=False, **kwargs):
         """
@@ -565,18 +458,6 @@ class LitModel(L.LightningModule):
         super().optimizer_step(*args, **kwargs)
         self.ema.update(self.model.parameters())
 
-    def augment_edge(self, data):
-        # Extract edge indices i, j from the data
-        i, j = data.edge_index
-
-        # Compute edge vectors (edge_vec) and edge lengths (edge_len)
-        edge_vec = data.pos[j] - data.pos[i]
-        edge_len = edge_vec.norm(dim=-1, keepdim=True)
-
-        # Concatenate edge vectors and edge lengths into edge_encoding
-        # data.edge_encoding = torch.hstack([edge_vec, edge_len])
-        data.edge_attr = edge_len
-        return data
 
 if __name__ == "__main__":
     print(os.getcwd())

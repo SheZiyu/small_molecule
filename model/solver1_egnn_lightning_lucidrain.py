@@ -25,53 +25,6 @@ from torch.optim import lr_scheduler
 from torch.cuda.amp import autocast
 from torch.nn.parallel import DataParallel
 
-# from small_sys_gnn.model.base import *
-# from small_sys_gnn.model.egnn import *
-
-def extract_pdb_from_zip(zip_folder, target_name, output_folder):
-    """Extract PDB file from a specific ZIP file."""
-    for zip_file_name in os.listdir(zip_folder):
-        if zip_file_name.endswith('.zip'):
-            if target_name in zip_file_name:
-                zip_file_path = os.path.join(zip_folder, zip_file_name)
-                with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-                    for file_name in zip_ref.namelist():
-                        if file_name.endswith('.pdb'):
-                            zip_ref.extract(file_name, output_folder)
-                            return os.path.join(output_folder, file_name)
-    return None
-
-def write_combined_pdb(original_pdb, new_coordinates, output_file):
-    """Write the combined PDB file with new coordinates."""
-    print(f"Writing PDB file: {output_file}")
-    print(f"Number of new coordinates: {len(new_coordinates)}")
-    with open(original_pdb, 'r') as original_file, open(output_file, 'w') as combined_file:
-        atom_idx = 0
-        for line in original_file:
-            if line.startswith('ATOM'):
-                atom_name = line[12:16].strip()
-                resname = line[17:20].strip()
-
-                # # Exclude hydrogen atoms
-                # if atom_name.startswith('H'):
-                #     combined_file.write(line)
-                #     continue
-
-                # Handle the new coordinates for non-hydrogen atoms
-                if atom_idx < len(new_coordinates):
-                    new_x, new_y, new_z = new_coordinates[atom_idx]
-                    atom_idx += 1
-                    new_line = f"{line[:30]}{new_x:8.3f}{new_y:8.3f}{new_z:8.3f}{line[54:]}"
-                    combined_file.write(new_line)
-                else:
-                    combined_file.write(line)
-
-            elif line.startswith('ATOM') and resname == "UNL":
-                combined_file.write(line)
-            else:
-                combined_file.write(line)
-
-    print(f"Finished writing PDB file: {output_file}")
 
 class DDPM(nn.Module):
     """
