@@ -1,2 +1,9 @@
 lightning_logs
+egnn.py
+egnn_pytorch.py
+solver1_gnn_lightning_kl.py
+solver1_egnn_lightning.py
+solver1_egnn_lightning_kl.py
+solver1_egnn_lightning_lucidrain.py
+solver1_egnn_lightning_lucidrain_kl.py
 
