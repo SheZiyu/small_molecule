@@ -257,7 +257,7 @@ class TrajectoriesDataset_Efficient(Dataset):
     def __init__(
             self,
             cutoff,
-            scale=1.0,
+            scale=2.0,
             augment=False,
             dataset=[],
             original_h5_file=None,
@@ -434,9 +434,9 @@ def generate_loaders(dataset, parameters):
 
 
 if __name__ == '__main__':
-    config = parse_toml_file('/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/config.toml')
+    config = parse_toml_file('config.toml')
     # directory_path = config['directory_path']
-    directory_path = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys_test'
+    directory_path = 'data/sys_test'
     cutoff = config['cutoff']
     scale = config['scale']
     node_dim = config['node_dim']
@@ -447,7 +447,7 @@ if __name__ == '__main__':
     DataAnalysis(directory_path, num_frames_to_process, align=True).preprocess_coordinate_onehot()
     TrajsDataset = TrajectoriesDataset_Efficient(cutoff,
                                                  scale,
-                                                 original_h5_file='/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys_test/resname_unl.h5')
+                                                 original_h5_file='data/sys_test/resname_unl.h5')
     A, B = TrajsDataset.get(0)
     AA, BB = TrajsDataset[0]
     loader = DataLoader(TrajsDataset, batch_size=2, num_workers=8, shuffle=True, pin_memory=False)

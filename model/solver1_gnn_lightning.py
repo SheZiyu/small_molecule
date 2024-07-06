@@ -276,21 +276,21 @@ class LitData(L.LightningDataModule):
         # ProteinAnalysis(directory_path, num_frames_to_process).preprocess_coordinate_onehot()
         TrajsDataset = TrajectoriesDataset_Efficient(cutoff=self.cutoff,
                                                      scale=self.scale,
-                                                     original_h5_file='/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys/resname_unl.h5')
+                                                     original_h5_file='data/sys/resname_unl.h5')
         return DataLoader(TrajsDataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True, pin_memory=True)
 
     def val_dataloader(self):
         # ProteinAnalysis(val_path, num_frames_to_process).preprocess_coordinate_onehot()
         TrajsDataset_val = TrajectoriesDataset_Efficient(cutoff=self.cutoff,
                                                          scale=self.scale,
-                                                         original_h5_file='/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys/resname_unl.h5')
+                                                         original_h5_file='data/sys/resname_unl.h5')
         return DataLoader(TrajsDataset_val, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False, pin_memory=True)
 
     def test_dataloader(self):
         # ProteinAnalysis(test_path, num_frames_to_process).preprocess_coordinate_onehot()
         TrajsDataset_test = TrajectoriesDataset_Efficient(cutoff=self.cutoff,
                                                           scale=self.scale,
-                                                          original_h5_file='/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys_test/resname_unl.h5')
+                                                          original_h5_file='data/sys_test/resname_unl.h5')
         return DataLoader(TrajsDataset_test, batch_size=1, num_workers=self.num_workers, shuffle=False,
                           pin_memory=True)
 
@@ -305,11 +305,10 @@ class LitModel(L.LightningModule):
         self.dpm = DDPM()
 
         self.optimizer = optim.Adam(self.model.parameters(), lr=config['learning_rate'])
-        self.scheduler = lr_scheduler.StepLR(self.optimizer, step_size=30, gamma=0.1)  # Configure scheduler here
+        self.scheduler = lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.1)  # Configure scheduler here
         self.ema = ExponentialMovingAverage(self.model.parameters(), decay=config['decay'])
 
         self.criterion = nn.MSELoss()
-        # self.criterion = nn.KLDivLoss(reduction='batchmean')
 
         self.save_hyperparameters()
 
@@ -319,42 +318,30 @@ class LitModel(L.LightningModule):
 
         # add noise to get morphism transition kernels
         with torch.no_grad():
-            unique_graph_indices = torch.unique(source_graphs.batch)
+            unique_graph_indices = torch.unique(target_graphs.batch)
             num_unique_graphs = len(unique_graph_indices)
             lambdas = torch.empty(num_unique_graphs, 1).uniform_(self.dpm.lambda_max, self.dpm.lambda_min)
             t = self.dpm.t_lambda(lambdas)
 
-            t_assigned = torch.zeros_like(source_graphs.batch, dtype=torch.float32)
+            t_assigned = torch.zeros_like(target_graphs.batch, dtype=torch.float32)
             for i, graph_idx in enumerate(unique_graph_indices):
-                graph_indices = (source_graphs.batch == graph_idx).nonzero(as_tuple=True)[0]
+                graph_indices = (target_graphs.batch == graph_idx).nonzero(as_tuple=True)[0]
                 t_assigned[graph_indices] = t[i]
             t_assigned = t_assigned[:, None]
 
-            # noised_pos, eps = self.dpm.forward_noise(source_graphs.pos, t_assigned)
-            noised_pos, eps = self.dpm.forward_noise(source_graphs.pos, t_assigned)
-        # print(t_assigned)
-        # transformed_graphs, h = self.model(
-        #     t=t_assigned,
-        #     edge_index=source_graphs.edge_index,
-        #     edge_attr=source_graphs.edge_attr,
-        #     x=noised_pos,
-        #     h=source_graphs.x,
-        #     cond=source_graphs.pos
-        # )
-
+            noised_pos, eps = self.dpm.forward_noise(target_graphs.pos, t_assigned)
+        
         pred_eps, h = self.model(
             t=t_assigned,
-            edge_index=source_graphs.edge_index,
-            edge_attr=source_graphs.edge_attr,
+            edge_index=target_graphs.edge_index,
+            edge_attr=target_graphs.edge_attr,
             x=noised_pos,
-            h=source_graphs.x,
+            h=target_graphs.x,
             cond=source_graphs.pos
         )
 
         # loss from one frame to another frame
-        # loss = self.criterion(transformed_graphs, target_graphs.pos)
         loss =self.criterion(pred_eps, eps)
-        # loss = F.kl_div(torch.log(transformed_graphs + 1e-10), target_graphs.pos, reduction='batchmean', log_target=False)
         self.log('train_loss', loss)
         self.log('learning_rate', self.optimizer.param_groups[0]['lr'])
 
@@ -362,94 +349,36 @@ class LitModel(L.LightningModule):
 
     def validation_step(self, batch):
         source_graphs, target_graphs = batch
-        unique_graph_indices = torch.unique(source_graphs.batch)
+        
+        unique_graph_indices = torch.unique(target_graphs.batch)
         num_unique_graphs = len(unique_graph_indices)
         lambdas = torch.empty(num_unique_graphs, 1).uniform_(self.dpm.lambda_max, self.dpm.lambda_min)
         t = self.dpm.t_lambda(lambdas)
 
-        t_assigned = torch.zeros_like(source_graphs.batch, dtype=torch.float32)
+        t_assigned = torch.zeros_like(target_graphs.batch, dtype=torch.float32)
         for i, graph_idx in enumerate(unique_graph_indices):
-            graph_indices = (source_graphs.batch == graph_idx).nonzero(as_tuple=True)[0]
+            graph_indices = (target_graphs.batch == graph_idx).nonzero(as_tuple=True)[0]
             t_assigned[graph_indices] = t[i]
         t_assigned = t_assigned[:, None]
-        # print(t_assigned)
-        # noised_pos, eps = self.dpm.forward_noise(source_graphs.pos, t_assigned)
-        noised_pos, eps = self.dpm.forward_noise(source_graphs.pos, t_assigned)
-        # transformed_graphs, h = self.model(
-        #     t=t_assigned,
-        #     edge_index=source_graphs.edge_index,
-        #     edge_attr=source_graphs.edge_attr,
-        #     x=noised_pos,
-        #     h=source_graphs.x,
-        #     cond=source_graphs.pos
-        # )
-
+       
+        noised_pos, eps = self.dpm.forward_noise(target_graphs.pos, t_assigned)
+        
         pred_eps, h = self.model(
             t=t_assigned,
-            edge_index=source_graphs.edge_index,
-            edge_attr=source_graphs.edge_attr,
+            edge_index=target_graphs.edge_index,
+            edge_attr=target_graphs.edge_attr,
             x=noised_pos,
-            h=source_graphs.x,
+            h=target_graphs.x,
             cond=source_graphs.pos
         )
+        
         # Compute loss
         with self.ema.average_parameters():
-            # loss = self.criterion(transformed_graphs, target_graphs.pos)
             loss = self.criterion(pred_eps, eps)
-            # loss = F.kl_div(torch.log(transformed_graphs + 1e-10), target_graphs.pos, reduction='batchmean', log_target=False)
         # Log the validation loss
         self.log('val_loss', loss)
+        
         return loss
-
-    def transform_frame(self, batch, is_noise=False):
-        source_graphs = batch[0]
-        # Ensure the model is in evaluation mode
-        self.model.eval()
-
-        with torch.no_grad():
-            # Assign t value to the source frame
-            lambdas = torch.empty(1, 1).uniform_(self.dpm.lambda_max, self.dpm.lambda_min)
-            t = self.dpm.t_lambda(lambdas)
-            t_assigned = torch.full((source_graphs.pos.shape[0], 1), t.item(), device=source_graphs.pos.device)
-            noised_pos, eps = self.dpm.forward_noise(source_graphs.pos, t_assigned)
-            if is_noise:
-                # Forward pass through the model
-                transformed_frame, h = self.model(
-                    t=t_assigned,
-                    edge_index=source_graphs.edge_index,
-                    edge_attr=source_graphs.edge_attr,
-                    x=noised_pos,
-                    h=source_graphs.x,
-                    cond=source_graphs.pos
-                )
-            else:
-                # Forward pass through the model
-                transformed_frame, h = self.model(
-                    t=t_assigned,
-                    edge_index=source_graphs.edge_index,
-                    edge_attr=source_graphs.edge_attr,
-                    x=source_graphs.pos,
-                    h=source_graphs.x,
-                    cond=source_graphs.pos
-                )
-
-        return transformed_frame
-
-    def test_sequence(self, batch, num_frames_to_process, folder, name, ref_pdb):
-        for step in range(num_frames_to_process):
-            transformed_frame = self.transform_frame(batch)
-            print(f"Step {step}, Transformed Frame Pos: {transformed_frame}")
-            # Save the generated frame as a PDB file
-            denoised_file = os.path.join(
-                folder,
-                'denoised_{}_from_frame_{}_to_{}.pdb'.format(name, step, step + 1)
-            )
-            write_combined_pdb(ref_pdb, transformed_frame.detach().cpu().numpy() / 2.0, denoised_file)
-
-            # Here you might want to save or process the transformed_frame
-            batch[0].pos = transformed_frame
-
-        return batch[0].pos
 
     def configure_optimizers(self):
         return {'optimizer': self.optimizer, 'lr_scheduler': self.scheduler}
@@ -461,9 +390,9 @@ class LitModel(L.LightningModule):
 
 if __name__ == "__main__":
     print(os.getcwd())
-    config = parse_toml_file('/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/config.toml')
-    directory_path = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys'
-    val_path = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys'
+    config = parse_toml_file('config.toml')
+    directory_path = 'data/sys'
+    val_path = 'data/sys'
     data_dir = config['data_dir']
     dataset_location = os.path.join(data_dir, 'dataset.pickle')
     cutoff = config['cutoff']
@@ -480,25 +409,9 @@ if __name__ == "__main__":
     num_frames_to_process = config['num_frames_to_process']
     os.environ['NCCL_P2P_DISABLE'] = '1'
 
-    # # ProteinAnalysis(directory_path, num_frames_to_process).preprocess_coordinate_onehot()
-    # TrajsDataset = TrajectoriesDataset_Efficient(cutoff=cutoff,
-    #                                              scale=scale,
-    #                                              original_h5_file='/data2/ziyu_project/trajs/not_(name_h*)_and_name_ca.h5')
-    # print(TrajsDataset)
-    # train_loader = generate_train_dataset(TrajsDataset, batch_size, num_workers)
-    # print(sys.getsizeof(train_loader))
-    #
-    # # ProteinAnalysis(val_path, num_frames_to_process).preprocess_coordinate_onehot()
-    # TrajsDataset_val = TrajectoriesDataset_Efficient(cutoff=cutoff,
-    #                                                  scale=scale,
-    #                                                  original_h5_file='/data2/ziyu_project/trajs_real_val/not_(name_h*)_and_name_ca.h5')
-    # print(TrajsDataset_val)
-    # val_loader = generate_val_dataset(TrajsDataset_val, batch_size, num_workers)
-    # print(sys.getsizeof(val_loader))
-
     datamodule = LitData(config)
     model = LitModel(config)
-    # model = LitModel.load_from_checkpoint('/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output/solver1_gnn_test_beta_8_1-v33.ckpt', config=config)
+    # model = LitModel.load_from_checkpoint('/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1-v5.ckpt', config=config)
 
     print(model.model.time_embedding.B)
     torch.manual_seed(42)
@@ -513,26 +426,19 @@ if __name__ == "__main__":
 
     # Model checkpoint callback
     checkpoint_callback = ModelCheckpoint(
-        # dirpath='/home/ziyu/PycharmProjects/pythonProject/Ex/output',
-        filename='/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output/solver1_gnn_test_beta_8_1',
+        filename='/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1',
         monitor='val_loss',
         mode='min'
     )
 
-    # from lightning.pytorch.loggers import CSVLogger
-    # logger = CSVLogger("logs", name="my_exp_name")
-
     # Initialize Trainer with early stopping callback and model checkpoint callback
     trainer = L.Trainer(
-        devices=1,
+        devices=2,
         accelerator="cuda",
         max_epochs=config['num_epochs'],
         callbacks=[early_stop_callback, checkpoint_callback],
         strategy="ddp_find_unused_parameters_true",
-        # strategy=DDPStrategy(find_unused_parameters=True, timeout=datetime.timedelta(seconds=14400)),
-        # precision="bf16",
         log_every_n_steps=50,
-        # logger=TensorBoardLogger(save_dir='/home/ziyu/PycharmProjects/pythonProject/Ex/output', name='gnn')
     )
 
     # Train the model

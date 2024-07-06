@@ -102,11 +102,11 @@ if __name__ == '__main__':
                     x_T = torch.randn_like(data[0].pos.to(device0))
                     i, j = radius_graph_custom(data[0].pos.to(device0),
                                                torch.tensor(0).to(device0),
-                                               torch.tensor(4.5).to(device0),
+                                               torch.tensor(3.0).to(device0),
                                                batch=torch.zeros(data[0].pos.shape[0]).to(device0))
 
                     # i, j = radius_graph(data[0].pos.to(device0),
-                    #                     torch.tensor(4.5).to(device0),
+                    #                     torch.tensor(3.0).to(device0),
                     #                     batch=torch.zeros(data[0].pos.shape[0]).to(device0))
                     data[0].edge_index = torch.stack([i, j]).to(device0)
                     data[0] = data[0].to(device0)

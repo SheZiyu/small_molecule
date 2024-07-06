@@ -34,9 +34,6 @@ import MDAnalysis as mda
 from utils.auxiliary import pairwise_distances, calculate_displacement_xyz, calculate_rmsf
 from prepocessing.preprocessing import parse_toml_file
 
-# Set random seed for reproducibility
-# torch.manual_seed(42)
-
 
 class DataAnalysis:
     def __init__(self, directory_path, num_frames_to_process, selection='resname UNL', scaling=True, scale=2.0, align=True):
@@ -252,7 +249,7 @@ class TrajectoriesDataset_Efficient(Dataset):
     def __init__(
             self,
             cutoff,
-            scale=1.0,
+            scale=2.0,
             augment=False,
             dataset=[],
             original_h5_file=None,
@@ -423,9 +420,9 @@ def generate_loaders(dataset, parameters):
 
 
 if __name__ == '__main__':
-    config = parse_toml_file('/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/config.toml')
+    config = parse_toml_file('config.toml')
     # directory_path = config['directory_path']
-    directory_path = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys'
+    directory_path = 'data/sys'
     cutoff = config['cutoff']
     scale = config['scale']
     node_dim = config['node_dim']
@@ -436,7 +433,7 @@ if __name__ == '__main__':
     DataAnalysis(directory_path, num_frames_to_process, align=True).preprocess_coordinate_onehot()
     TrajsDataset = TrajectoriesDataset_Efficient(cutoff,
                                                  scale,
-                                                 original_h5_file='/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys/resname_unl.h5')
+                                                 original_h5_file='data/sys/resname_unl.h5')
     A, B = TrajsDataset.get(0)
     AA, BB = TrajsDataset[0]
     loader = DataLoader(TrajsDataset, batch_size=2, num_workers=8, shuffle=True, pin_memory=False)
