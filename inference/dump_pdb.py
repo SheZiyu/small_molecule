@@ -8,13 +8,13 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Specify the file path to the .npy file
-file_path = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output_images_gnn_solver1/1a10A/all_positions.npy'
+file_path = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A/all_positions.npy'
 # Load the numpy array from the .npy file
 xyz = np.load(file_path)
 print(f"Loaded positions array shape: {xyz.shape}")
 
 # Load the PDB file to get the topology
-pdb_file = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output_images_gnn_solver1/1a10A/gt_1a10A.pdb'
+pdb_file = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A/gt_1a10A.pdb'
 u = mda.Universe(pdb_file)
 print(f"Loaded PDB file: {pdb_file}")
 
@@ -40,7 +40,7 @@ for ts in new_universe.trajectory:
     ts.dimensions = unitcell
 
 # Save the new trajectory in different formats
-output_dir = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output_images_gnn_solver1/1a10A'
+output_dir = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A'
 os.makedirs(output_dir, exist_ok=True)
 print(f"Output directory: {output_dir}")
 

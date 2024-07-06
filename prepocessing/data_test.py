@@ -274,7 +274,7 @@ class TrajectoriesDataset_Efficient(Dataset):
         self.dataset = dataset
         self.indices_traj_frames = []
         self.h5_file = h5py.File(self.original_h5_file, 'r')
-        self.smiles = smiles
+        self.smiles = smiles # change in future for multi-systems
 
         with h5py.File(self.original_h5_file, 'r') as hf:
             # Access the group containing the datasets

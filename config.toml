@@ -21,7 +21,7 @@ vector_dim = 3
 edge_type_dim = 3
 edge_dim = 1
 cutoff = 1.5
-scale = 4
+scale = 3
 scale_var = 2
 num_bins = 20
 

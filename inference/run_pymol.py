@@ -5,11 +5,11 @@
 # pymol.finish_launching()
 
 # Load the topology file (PDB)
-pdb_path = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output_images_gnn_solver1/1a10A/gt_1a10A.pdb'
+pdb_path = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A/gt_1a10A.pdb'
 cmd.load(pdb_path, 'gt_1a10A')
 
 # Load the trajectory file (XTC) into the existing topology
-xtc_path = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output_images_gnn_solver1/1a10A/output_trajectory.xtc'
+xtc_path = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A/output_trajectory.xtc'
 cmd.load_traj(xtc_path, 'gt_1a10A')
 
 # Center the view on the molecule
@@ -34,4 +34,4 @@ cmd.show('cartoon', 'gt_1a10A')
 # cmd.bg_color('white')
 
 # Save the session if needed
-cmd.save('/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output_images_gnn_solver1/1a10A/aligned_trajectory.pse')
+cmd.save('/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A/aligned_trajectory.pse')

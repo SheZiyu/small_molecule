@@ -30,9 +30,11 @@ from torch.cuda.amp import autocast
 from torch.nn.parallel import DataParallel
 from torch_geometric.loader import DataLoader
 
-from utils.auxiliary import write_combined_pdb
+from prepocessing.from_noe import rdmol_to_edge
+from prepocessing.transforms import extend_to_radius_graph
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data import TrajectoriesDataset_Efficient
+from utils.auxiliary import write_combined_pdb
 from model.base import DynamicsGNN
 
 
@@ -91,7 +93,7 @@ class DDPM(nn.Module):
         x_t = self.alpha_t(t) * x + self.sigma_t(t) * eps  # Applies the diffusion process.
         return x_t, eps
 
-    def reverse_denoise(self, x_T, noise_net, solver, order=1, M=30, return_all=False, **kwargs):
+    def reverse_denoise(self, x_T, noise_net, solver, order=1, M=30, return_all=False, update_edge=True, **kwargs):
         """
         Performs the reverse denoising process, reconstructing the data from its noised state.
 
@@ -120,7 +122,7 @@ class DDPM(nn.Module):
     def adaptive_reverse_denoise(self, x_T, noise_net,
                                  solver1, solver2, solver3,
                                  order1, order2, order3,
-                                 M=30, return_all=False, **kwargs):
+                                 M=30, return_all=False, update_edge=True, **kwargs):
         """
         Performs the reverse denoising process, reconstructing the data from its noised state.
 

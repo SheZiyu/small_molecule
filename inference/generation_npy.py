@@ -14,9 +14,13 @@ import torch
 # from torch_geometric.data.batch import *
 from torch_geometric.nn.pool import radius_graph
 
-from utils.auxiliary import radius_graph_custom, augment_edge, extract_pdb_from_zip, write_combined_pdb
+from rdkit import Chem
+
+from prepocessing.from_noe import rdmol_to_edge
+from prepocessing.transforms import extend_to_radius_graph
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data_test import TrajectoriesDataset_Efficient, generate_test_dataset
+from utils.auxiliary import radius_graph_custom, augment_edge, extract_pdb_from_zip, write_combined_pdb
 from model.solver1_gnn_lightning import LitModel
 
 
@@ -52,7 +56,7 @@ if __name__ == '__main__':
 
     test_loader = generate_test_dataset(TrajsDataset_test, 1, num_workers)
     Model = LitModel.load_from_checkpoint(
-        '/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1-v34.ckpt', config=config)
+        '/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1-v1.ckpt', config=config)
     model = Model.model.to(device0)
     print(model.time_embedding.B)
     # exit()
@@ -62,13 +66,19 @@ if __name__ == '__main__':
 
     output_dir = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1'
     os.makedirs(output_dir, exist_ok=True)
-
+    
     # Test the model on the test set
     with torch.no_grad():
         for idx, data in enumerate(test_loader, 1):
             # Initialize an empty list to store numpy arrays
 
             if idx == 1:
+                # Covalent bond 
+                smiles = "CC(C(=O)O)N" # change in future for multi-systems
+                mol = Chem.MolFromSmiles(smiles)
+                mol = Chem.AddHs(mol)
+                covalent_edge_index, covalent_edge_type = rdmol_to_edge(mol)
+    
                 name = data[0].name
                 name = np.str_(name[0])[2:-1]
                 folder = os.path.join(output_dir, name)
@@ -86,22 +96,27 @@ if __name__ == '__main__':
 
                 for stop_idx in range(num_frames_to_process):
                     x_T = torch.randn_like(data[0].pos.to(device0))
-                    i, j = radius_graph_custom(data[0].pos.to(device0),
-                                               torch.tensor(0).to(device0),
-                                               torch.tensor(6.0).to(device0),
-                                               batch=torch.zeros(data[0].pos.shape[0]).to(device0))
-
                     # i, j = radius_graph(data[0].pos.to(device0),
-                    #                     torch.tensor(6.0).to(device0),
+                    #                     torch.tensor(4.5).to(device0),
                     #                     batch=torch.zeros(data[0].pos.shape[0]).to(device0))
-                    data[0].edge_index = torch.stack([i, j]).to(device0)
+                    # data[0].edge_index = torch.stack([i, j]).to(device0)
+                    # data[0] = data[0].to(device0)
+                    # data[0] = augment_edge(data[0])
+                    
+                    data[0].edge_index, data[0].edge_type = extend_to_radius_graph(
+                        data[0].pos.to(device0),
+                        covalent_edge_index.to(device0), 
+                        covalent_edge_type.to(device0),
+                        torch.tensor(4.5).to(device0),
+                        torch.zeros(data[0].pos.shape[0]).to(device0))
                     data[0] = data[0].to(device0)
                     data[0] = augment_edge(data[0])
 
                     pos = dpm.adaptive_reverse_denoise(x_T, model,
                                                        dpm.solver1, dpm.solver2, dpm.solver3,
-                                                       order1=500, order2=0, order3=0, M=500,
+                                                       order1=200, order2=0, order3=0, M=200,
                                                        edge_index=data[0].edge_index,
+                                                       edge_type=data[0].edge_type,
                                                        edge_attr=data[0].edge_attr,
                                                        h=data[0].x,
                                                        cond=data[0].pos)
