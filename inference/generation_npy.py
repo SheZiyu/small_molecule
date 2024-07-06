@@ -14,19 +14,16 @@ import torch
 # from torch_geometric.data.batch import *
 from torch_geometric.nn.pool import radius_graph
 
-# from small_sys_gnn.model.solver1_gnn_lightning import *
-# from small_sys_gnn.data.data_test import *
 from utils.auxiliary import radius_graph_custom, augment_edge, extract_pdb_from_zip, write_combined_pdb
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data_test import TrajectoriesDataset_Efficient, generate_test_dataset
 from model.solver1_gnn_lightning import LitModel
 
+
 if __name__ == '__main__':
     print(os.getcwd())
-    config = parse_toml_file('/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/config.toml')
-    directory_path = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys_test'
-    data_dir = config['data_dir']
-    dataset_location = os.path.join(data_dir, 'dataset.pickle')
+    config = parse_toml_file('config.toml')
+    directory_path = 'data/sys_test'
     cutoff = config['cutoff']
     scale = config['scale']
     node_dim = config['node_dim']
@@ -48,25 +45,14 @@ if __name__ == '__main__':
     patience = config['patience']
     num_frames_to_process = 100 # config['num_frames_to_process']
 
-    # DataAnalysis(directory_path, num_frames_to_process).preprocess_coordinate_onehot()
-    # TrajsDataset = TrajectoriesDataset(
-    #     False,
-    #     directory_path,
-    #     num_frames_to_process,
-    #     cutoff=cutoff,
-    #     scale=scale,
-    #     file=None#'/data2/ziyu_project/trajs/not_(name_h*)_and_name_ca_ehgn.h5'
-    # )
-    # test_loader = generate_test_dataset(TrajsDataset, 1, num_workers)
-    # print(sys.getsizeof(test_loader))
     TrajsDataset_test = TrajectoriesDataset_Efficient(cutoff=cutoff,
                                                       scale=scale,
-                                                      original_h5_file='/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/small_sys/sys_test/resname_unl.h5')
+                                                      original_h5_file='data/sys_test/resname_unl.h5')
     print(TrajsDataset_test)
 
     test_loader = generate_test_dataset(TrajsDataset_test, 1, num_workers)
     Model = LitModel.load_from_checkpoint(
-        '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output/solver1_gnn_test_beta_8_1-v34.ckpt', config=config)
+        '/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1-v34.ckpt', config=config)
     model = Model.model.to(device0)
     print(model.time_embedding.B)
     # exit()
@@ -74,7 +60,7 @@ if __name__ == '__main__':
     # torch.manual_seed(42)
     Model.to(device0).eval()
 
-    output_dir = '/home/ziyu/PycharmProjects/pythonProject/small_sys_gnn/output_images_gnn_solver1'
+    output_dir = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1'
     os.makedirs(output_dir, exist_ok=True)
 
     # Test the model on the test set
@@ -102,11 +88,11 @@ if __name__ == '__main__':
                     x_T = torch.randn_like(data[0].pos.to(device0))
                     i, j = radius_graph_custom(data[0].pos.to(device0),
                                                torch.tensor(0).to(device0),
-                                               torch.tensor(3.0).to(device0),
+                                               torch.tensor(6.0).to(device0),
                                                batch=torch.zeros(data[0].pos.shape[0]).to(device0))
 
                     # i, j = radius_graph(data[0].pos.to(device0),
-                    #                     torch.tensor(3.0).to(device0),
+                    #                     torch.tensor(6.0).to(device0),
                     #                     batch=torch.zeros(data[0].pos.shape[0]).to(device0))
                     data[0].edge_index = torch.stack([i, j]).to(device0)
                     data[0] = data[0].to(device0)

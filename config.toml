@@ -20,7 +20,7 @@ node_dim = 17
 vector_dim = 3
 edge_dim = 1
 cutoff = 1.5
-scale = 2
+scale = 4
 scale_var = 2
 num_bins = 20
 

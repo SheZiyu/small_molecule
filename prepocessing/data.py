@@ -29,8 +29,11 @@ from torch_geometric.typing import OptTensor
 from torch_geometric.utils import scatter, to_networkx
 from torch_geometric.transforms import gcn_norm, Compose
 
+from rdkit import Chem
 import MDAnalysis as mda
 
+from prepocessing.from_noe import rdmol_to_edge
+from prepocessing.transforms import extend_to_radius_graph
 from utils.auxiliary import pairwise_distances, calculate_displacement_xyz, calculate_rmsf
 from prepocessing.preprocessing import parse_toml_file
 
@@ -249,11 +252,11 @@ class TrajectoriesDataset_Efficient(Dataset):
     def __init__(
             self,
             cutoff,
-            scale=2.0,
+            scale=1.0,
             augment=False,
             dataset=[],
             original_h5_file=None,
-
+            smiles = "CC(C(=O)O)N" # change in future for multi-systems
     ):
         super(TrajectoriesDataset_Efficient, self).__init__()
         self.cutoff = cutoff
@@ -263,6 +266,7 @@ class TrajectoriesDataset_Efficient(Dataset):
         self.dataset = dataset
         self.indices_traj_frames = []
         self.h5_file = h5py.File(self.original_h5_file, 'r')
+        self.smiles = smiles
 
         with h5py.File(self.original_h5_file, 'r') as hf:
             # Access the group containing the datasets
@@ -300,28 +304,48 @@ class TrajectoriesDataset_Efficient(Dataset):
         # Load one-hot trajectory array
         one_hot_traj = np.array(group[one_hot_traj_key])
         one_hot_traj = torch.tensor(one_hot_traj, dtype=torch.float)  # .unsqueeze(0).expand([coordinates_array.shape[0], -1, -1])
-
+ 
         # Load numbers of atoms array
         atoms_num = np.array(group[atoms_num_key])
-
-        i, j = radius_graph(coordinates_array,
-                            self.cutoff*self.scale,
-                            batch=torch.zeros(coordinates_array.shape[0]))
-        edge_index = torch.stack([i, j])
-
-        i, j = radius_graph(coordinates_array_plus1,
-                            self.cutoff * self.scale,
-                            batch=torch.ones(coordinates_array_plus1.shape[0]))
-        edge_index_plus1 = torch.stack([i, j])
+        
+        # Covalent bond 
+        mol = Chem.MolFromSmiles(self.smiles)
+        mol = Chem.AddHs(mol)
+        covalent_edge_index, covalent_edge_type = rdmol_to_edge(mol)
+        
+        # Create virtual bond based on distance 
+        # i, j = radius_graph(coordinates_array,
+        #                     self.cutoff*self.scale,
+        #                     batch=torch.zeros(coordinates_array.shape[0]))
+        # edge_index = torch.stack([i, j])
+        # edge_type = torch.zeros(edge_index.size(-1), dtype=torch.long)
+        # i, j = radius_graph(coordinates_array_plus1,
+        #                     self.cutoff * self.scale,
+        #                     batch=torch.ones(coordinates_array_plus1.shape[0]))
+        # edge_index_plus1 = torch.stack([i, j])
+        # edge_type_plus1 = torch.zeros(edge_index_plus1.size(-1), dtype=torch.long)
+        
+        edge_index, edge_type = extend_to_radius_graph(
+            coordinates_array,
+            covalent_edge_index, 
+            covalent_edge_type,
+            self.cutoff * self.scale,
+            torch.zeros(coordinates_array.shape[0]))
+        edge_index_plus1, edge_type_plus1 = extend_to_radius_graph(
+            coordinates_array_plus1,
+            covalent_edge_index, 
+            covalent_edge_type,
+            self.cutoff * self.scale,
+            torch.ones(coordinates_array_plus1.shape[0]))
 
         frame_idx = torch.tensor(frame_idx).repeat([coordinates_array.shape[0], 1])
-
         frame_idx_plus1 = frame_idx + 1
 
         data = Data(
             pos=coordinates_array,
             x=one_hot_traj,
             edge_index=edge_index,
+            edge_type=edge_type,
             traj_idx=system_idx,
             frame_idx=frame_idx,
             atoms_num=atoms_num)
@@ -331,6 +355,7 @@ class TrajectoriesDataset_Efficient(Dataset):
             pos=coordinates_array_plus1,
             x=one_hot_traj,
             edge_index=edge_index_plus1,
+            edge_type=edge_type_plus1,
             traj_idx=system_idx,
             frame_idx=frame_idx_plus1,
             atoms_num=atoms_num)
@@ -430,7 +455,7 @@ if __name__ == '__main__':
     vector_dim = config['vector_dim']
     device = config['device']
     num_frames_to_process = config['num_frames_to_process']
-    DataAnalysis(directory_path, num_frames_to_process, align=True).preprocess_coordinate_onehot()
+    # DataAnalysis(directory_path, num_frames_to_process, align=True).preprocess_coordinate_onehot()
     TrajsDataset = TrajectoriesDataset_Efficient(cutoff,
                                                  scale,
                                                  original_h5_file='data/sys/resname_unl.h5')

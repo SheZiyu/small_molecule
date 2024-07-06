@@ -410,8 +410,8 @@ if __name__ == "__main__":
     os.environ['NCCL_P2P_DISABLE'] = '1'
 
     datamodule = LitData(config)
-    model = LitModel(config)
-    # model = LitModel.load_from_checkpoint('/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1-v5.ckpt', config=config)
+    # model = LitModel(config)
+    model = LitModel.load_from_checkpoint('/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1-v10.ckpt', config=config)
 
     print(model.model.time_embedding.B)
     torch.manual_seed(42)
