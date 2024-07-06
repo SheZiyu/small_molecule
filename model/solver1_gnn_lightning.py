@@ -301,7 +301,7 @@ class LitModel(L.LightningModule):
         self.config = config
 
         #  Initialize your model, optimizer, scheduler, criterion, etc
-        self.model = DynamicsGNN(config['node_dim'], config['edge_dim'], config['vector_dim'])
+        self.model = DynamicsGNN(config['node_dim'], config['edge_dim'], config['edge_type_dim'], config['vector_dim'])
         self.dpm = DDPM()
 
         self.optimizer = optim.Adam(self.model.parameters(), lr=config['learning_rate'])
@@ -334,6 +334,7 @@ class LitModel(L.LightningModule):
         pred_eps, h = self.model(
             t=t_assigned,
             edge_index=target_graphs.edge_index,
+            edge_type=target_graphs.edge_type,
             edge_attr=target_graphs.edge_attr,
             x=noised_pos,
             h=target_graphs.x,
@@ -366,6 +367,7 @@ class LitModel(L.LightningModule):
         pred_eps, h = self.model(
             t=t_assigned,
             edge_index=target_graphs.edge_index,
+            edge_type=target_graphs.edge_type,
             edge_attr=target_graphs.edge_attr,
             x=noised_pos,
             h=target_graphs.x,
@@ -410,8 +412,8 @@ if __name__ == "__main__":
     os.environ['NCCL_P2P_DISABLE'] = '1'
 
     datamodule = LitData(config)
-    # model = LitModel(config)
-    model = LitModel.load_from_checkpoint('/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1-v10.ckpt', config=config)
+    model = LitModel(config)
+    # model = LitModel.load_from_checkpoint('/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1-v10.ckpt', config=config)
 
     print(model.model.time_embedding.B)
     torch.manual_seed(42)

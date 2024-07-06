@@ -220,13 +220,13 @@ def extend_to_radius_graph(
     """
     assert edge_type.dim() == 1
     number_nodes = coords.size(0)
-    bgraph_adj = torch.sparse.LongTensor(
+    bgraph_adj = torch.sparse_coo_tensor(
         edge_index, edge_type, torch.Size([number_nodes, number_nodes])
     )
     rgraph_edge_index = radius_graph(coords, r=cutoff, batch=node2graph)  # (2, E_r)
     # radius_graph(coords.to(5), r=cutoff, batch=node2graph.to(5))
 
-    rgraph_adj = torch.sparse.LongTensor(
+    rgraph_adj = torch.sparse_coo_tensor(
         rgraph_edge_index,
         torch.ones(rgraph_edge_index.size(1)).long().to(coords.device)
         * unspecified_type_number,

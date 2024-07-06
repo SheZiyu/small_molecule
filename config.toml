@@ -18,6 +18,7 @@ device = 'cpu'
 
 node_dim = 17
 vector_dim = 3
+edge_type_dim = 3
 edge_dim = 1
 cutoff = 1.5
 scale = 4

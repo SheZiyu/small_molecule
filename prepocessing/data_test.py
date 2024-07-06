@@ -322,6 +322,7 @@ class TrajectoriesDataset_Efficient(Dataset):
         mol = Chem.MolFromSmiles(self.smiles)
         mol = Chem.AddHs(mol)
         covalent_edge_index, covalent_edge_type = rdmol_to_edge(mol)
+        # print(covalent_edge_type)
         
         # Create virtual bond based on distance 
         # i, j = radius_graph(coordinates_array,
@@ -477,23 +478,24 @@ if __name__ == '__main__':
                                                  original_h5_file='data/sys_test/resname_unl.h5')
     A, B = TrajsDataset.get(0)
     AA, BB = TrajsDataset[0]
-    loader = DataLoader(TrajsDataset, batch_size=2, num_workers=8, shuffle=True, pin_memory=False)
+    loader = DataLoader(TrajsDataset, batch_size=1, num_workers=8, shuffle=True, pin_memory=False)
     for (a, b) in loader:
     #     print('a')
     #     # del(a)
         print(a)
         print(b)
-        # print(aa)
-        print(a.atoms_num)
-        print(type(a.atoms_num))
-        print(a.frame_idx)
-        print(len(a.frame_idx))
-        print(b.frame_idx)
-        print(a.rmsf)
-        print(len(a.rmsf[0]))
-        print(b.rmsf)
-        print(a.batch)
-        print(b.batch)
+         
+        # print(a.atoms_num)
+        # print(type(a.atoms_num))
+        # print(a.frame_idx)
+        # print(len(a.frame_idx))
+        # print(b.frame_idx)
+        # print(a.rmsf)
+        # print(len(a.rmsf[0]))
+        # print(b.rmsf)
+        # print(a.batch)
+        # print(b.batch)
+        print(a.x)
         break
 
 

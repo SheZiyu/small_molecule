@@ -165,7 +165,7 @@ class GNN_layer(nn.Module):
     GNN_layer is used to update node coordinates and node features, here we set edge_index and edge_attr as constants
     '''
 
-    def __init__(self, node_dim, edge_dim, message_dim, hidden_dim, vector_dim, scalar_dim):
+    def __init__(self, node_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim):
         '''
         :param node_dim:
         :param edge_dim:
@@ -175,7 +175,8 @@ class GNN_layer(nn.Module):
         :param scalar_dim:
         '''
         super(GNN_layer, self).__init__()
-        scalars_dim = node_dim * 2 + edge_dim
+        scalars_dim = node_dim * 2 + edge_dim + edge_type_dim
+        self.edge_type_dim = edge_type_dim
         self.vector_dim = vector_dim
         self.scalar_dim = scalar_dim
         self.messageNN = MessagePassingGNN(vector_dim=vector_dim*2, scalars_dim=scalars_dim, output_dim=message_dim,
@@ -194,7 +195,7 @@ class GNN_layer(nn.Module):
                           iscond=False
                           )
 
-    def forward(self, edge_index, edge_attr, x, h, cond):
+    def forward(self, edge_index, edge_type, edge_attr, x, h, cond):
         '''
         :param edge_index: adjacency matrix of shape (2, num_edges)
         :param edge_attr: edge features of shape (num_edges, edge_dim)
@@ -206,7 +207,8 @@ class GNN_layer(nn.Module):
         row, col = edge_index[0], edge_index[1]
         xij = torch.cat([x[row], x[col]], dim=-1)
         # print(h[row], h[col], edge_attr)
-        hij = torch.cat([h[row], h[col], edge_attr], dim=-1)
+        edge_type_one_hot = F.one_hot(edge_type, num_classes=self.edge_type_dim)
+        hij = torch.cat([h[row], h[col], edge_attr, edge_type_one_hot], dim=-1)
         condij = torch.cat([cond[row], cond[col]], dim=-1)
         message = self.messageNN(xij, scalars=hij, cond=condij)  # [bm, message_dim]
         vector = self.vectorNN(message, cond=condij)  # [bm, vector_dim]
@@ -218,7 +220,7 @@ class GNN_layer(nn.Module):
         return vector, node_attr, cond
 
 class GNN(nn.Module):
-    def __init__(self, num_layers, node_dim, edge_dim, message_dim, hidden_dim, vector_dim, scalar_dim):
+    def __init__(self, num_layers, node_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim):
         '''
         :param num_layers:
         :param node_dim:
@@ -230,13 +232,13 @@ class GNN(nn.Module):
         '''
         super(GNN, self).__init__()
         layers = list()
-        gnn_layer = GNN_layer(node_dim, edge_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
+        gnn_layer = GNN_layer(node_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
         for i in range(num_layers):
             layers.append(gnn_layer)
 
         self.gnn = nn.ModuleList(layers)
 
-    def forward(self, edge_index, edge_attr, x, h, cond):
+    def forward(self, edge_index, edge_type, edge_attr, x, h, cond):
         '''
         :param edge_index: adjacency matrix of shape (2, num_edges)
         :param edge_attr: edge features of shape (num_edges, edge_dim)
@@ -246,7 +248,7 @@ class GNN(nn.Module):
                  h: node features of shape (num_nodes, node_dim)
         '''
         for l in self.gnn:
-            x, h, cond = l(edge_index, edge_attr, x, h, cond)
+            x, h, cond = l(edge_index, edge_type, edge_attr, x, h, cond)
         return x, h, cond
 
 class MessagePassingEGNN(nn.Module):
@@ -411,27 +413,27 @@ class FourierTimeEmbedding(nn.Module):
         return torch.cat([torch.cos(v_proj), torch.sin(v_proj)], dim=-1)
 
 class DynamicsGNN(nn.Module):
-    def __init__(self, node_dim, edge_dim, vector_dim,
+    def __init__(self, node_dim, edge_dim, edge_type_dim, vector_dim,
                  model=GNN, num_layers=1,
                  message_dim=8, hidden_dim=512, scalar_dim=16
                  ):
         super(DynamicsGNN, self).__init__()
         self.time_embedding = FourierTimeEmbedding(embed_dim=hidden_dim, input_dim=1)
         self.mlp = MLP([hidden_dim, node_dim], iscond=False)
-        self.model1 = model(num_layers, node_dim, edge_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
-        self.model2 = model(num_layers, node_dim, edge_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
-        self.model3 = model(num_layers, node_dim, edge_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
+        self.model1 = model(num_layers, node_dim, edge_dim, edge_type_dim,  message_dim, hidden_dim, vector_dim, scalar_dim)
+        self.model2 = model(num_layers, node_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
+        self.model3 = model(num_layers, node_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
         # Sanity check
         self.invariant_scalr = MLP([node_dim, 1], iscond=False)
 
-    def forward(self, t, edge_index, edge_attr, x, h, cond):
+    def forward(self, t, edge_index, edge_type, edge_attr, x, h, cond):
         t = self.time_embedding(t)
         t = self.mlp(t)
         # print(t.shape)
         h = h + t
-        x, h, cond = self.model1(edge_index, edge_attr, x, h, cond)
-        x, h, cond = self.model2(edge_index, edge_attr, x, h, cond)
-        x, h, cond = self.model3(edge_index, edge_attr, x, h, cond)
+        x, h, cond = self.model1(edge_index, edge_type, edge_attr, x, h, cond)
+        x, h, cond = self.model2(edge_index, edge_type, edge_attr, x, h, cond)
+        x, h, cond = self.model3(edge_index, edge_type, edge_attr, x, h, cond)
         h = self.invariant_scalr(h)
         return x, h
 
@@ -471,10 +473,8 @@ class DynamicsEGNN(nn.Module):
                 module.reset_parameters()
 
 if __name__ == '__main__':
-    config = parse_toml_file('/home/ziyu/PycharmProjects/pythonProject/Ex/config.toml')
+    config = parse_toml_file('config.toml')
     directory_path = '/data2/ziyu_project/test'
-    data_dir = config['data_dir']
-    dataset_location = os.path.join(data_dir, 'dataset.pickle')
     cutoff = config['cutoff']
     scale = config['scale']
     node_dim = config['node_dim']
