@@ -429,6 +429,8 @@ class DynamicsGNN(nn.Module):
 
     def forward(self, t, edge_index, edge_type, edge_attr, x, h, cond):
         t = self.time_embedding(t)
+        # print(t.shape)
+        # print(h.shape)
         h = torch.cat([h, t], dim=-1)
         x, h, cond = self.model1(edge_index, edge_type, edge_attr, x, h, cond)
         x, h, cond = self.model2(edge_index, edge_type, edge_attr, x, h, cond)

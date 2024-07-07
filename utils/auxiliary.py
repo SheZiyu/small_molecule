@@ -103,6 +103,19 @@ def augment_edge(data):
     data.edge_attr = edge_len
     return data
 
+def augment_edge_extend(data, edge_index, pos):
+    # Extract edge indices i, j from the data
+    i, j = edge_index
+
+    # Compute edge vectors (edge_vec) and edge lengths (edge_len)
+    edge_vec = pos[j] - pos[i]
+    edge_len = edge_vec.norm(dim=-1, keepdim=True)
+
+    # Concatenate edge vectors and edge lengths into edge_encoding
+    # data.edge_encoding = torch.hstack([edge_vec, edge_len])
+    data.edge_attr = edge_len
+    return data
+
 def extract_pdb_from_zip(zip_folder, target_name, output_folder):
     """Extract PDB file from a specific ZIP file."""
     for zip_file_name in os.listdir(zip_folder):

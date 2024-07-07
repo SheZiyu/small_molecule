@@ -33,8 +33,8 @@ from torch_geometric.loader import DataLoader
 from prepocessing.from_noe import rdmol_to_edge
 from prepocessing.transforms import extend_to_radius_graph
 from prepocessing.preprocessing import parse_toml_file
-from prepocessing.data import TrajectoriesDataset_Efficient
-from utils.auxiliary import write_combined_pdb
+from prepocessing.data_extend import TrajectoriesDataset_Efficient
+from utils.auxiliary import write_combined_pdb, augment_edge_extend
 from model.base import DynamicsGNN
 
 
@@ -399,6 +399,9 @@ class LitModel(L.LightningModule):
             config["vector_dim"],
         )
         self.dpm = DDPM()
+        
+        self.cutoff = config["cutoff"]
+        self.scale = config["scale"]
 
         self.optimizer = optim.Adam(self.model.parameters(), lr=config["learning_rate"])
         self.scheduler = lr_scheduler.StepLR(
@@ -434,11 +437,26 @@ class LitModel(L.LightningModule):
             t_assigned = t_assigned[:, None]
 
             noised_pos, eps = self.dpm.forward_noise(target_graphs.pos, t_assigned)
-
+            
+            edge_index, edge_type = extend_to_radius_graph(
+                source_graphs.pos,
+                source_graphs.edge_index, 
+                source_graphs.edge_type,
+                self.cutoff * self.scale,
+                source_graphs.batch)
+            source_graphs = augment_edge_extend(source_graphs, edge_index, source_graphs.pos)
+            edge_index_plus1, edge_type_plus1 = extend_to_radius_graph(
+                noised_pos,
+                target_graphs.edge_index, 
+                target_graphs.edge_type,
+                self.cutoff * self.scale,
+                target_graphs.batch)
+            target_graphs = augment_edge_extend(target_graphs, edge_index_plus1, noised_pos)
+            
         pred_eps, h = self.model(
             t=t_assigned,
-            edge_index=target_graphs.edge_index,
-            edge_type=target_graphs.edge_type,
+            edge_index=edge_index_plus1,
+            edge_type=edge_type_plus1,
             edge_attr=target_graphs.edge_attr,
             x=noised_pos,
             h=target_graphs.x,
@@ -469,11 +487,26 @@ class LitModel(L.LightningModule):
         t_assigned = t_assigned[:, None]
 
         noised_pos, eps = self.dpm.forward_noise(target_graphs.pos, t_assigned)
+        
+        edge_index, edge_type = extend_to_radius_graph(
+                source_graphs.pos,
+                source_graphs.edge_index, 
+                source_graphs.edge_type,
+                self.cutoff * self.scale,
+                source_graphs.batch)
+        source_graphs = augment_edge_extend(source_graphs, edge_index, source_graphs.pos)
+        edge_index_plus1, edge_type_plus1 = extend_to_radius_graph(
+                noised_pos,
+                target_graphs.edge_index, 
+                target_graphs.edge_type,
+                self.cutoff * self.scale,
+                target_graphs.batch)
+        target_graphs = augment_edge_extend(target_graphs, edge_index_plus1, noised_pos)
 
         pred_eps, h = self.model(
             t=t_assigned,
-            edge_index=target_graphs.edge_index,
-            edge_type=target_graphs.edge_type,
+            edge_index=edge_index_plus1,
+            edge_type=edge_type_plus1,
             edge_attr=target_graphs.edge_attr,
             x=noised_pos,
             h=target_graphs.x,
@@ -516,8 +549,8 @@ if __name__ == "__main__":
     os.environ["NCCL_P2P_DISABLE"] = "1"
 
     datamodule = LitData(config)
-    # model = LitModel(config)
-    model = LitModel.load_from_checkpoint('/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1.ckpt', config=config)
+    model = LitModel(config)
+    # model = LitModel.load_from_checkpoint('/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1_extend.ckpt', config=config)
 
     print(model.model.time_embedding.B)
     torch.manual_seed(42)
@@ -529,14 +562,14 @@ if __name__ == "__main__":
 
     # Model checkpoint callback
     checkpoint_callback = ModelCheckpoint(
-        filename="/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1",
+        filename="/home/ziyu/repos/small_molecule/output/solver1_gnn_test_beta_8_1_extend",
         monitor="val_loss",
         mode="min",
     )
 
     # Initialize Trainer with early stopping callback and model checkpoint callback
     trainer = L.Trainer(
-        devices=4,
+        devices=[4,5],
         accelerator="cuda",
         max_epochs=config["num_epochs"],
         callbacks=[early_stop_callback, checkpoint_callback],
