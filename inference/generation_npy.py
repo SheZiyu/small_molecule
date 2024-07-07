@@ -114,7 +114,7 @@ if __name__ == '__main__':
 
                     pos = dpm.adaptive_reverse_denoise(x_T, model,
                                                        dpm.solver1, dpm.solver2, dpm.solver3,
-                                                       order1=200, order2=0, order3=0, M=200,
+                                                       order1=500, order2=0, order3=0, M=500,
                                                        edge_index=data[0].edge_index,
                                                        edge_type=data[0].edge_type,
                                                        edge_attr=data[0].edge_attr,
