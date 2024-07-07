@@ -94,7 +94,7 @@ output
 output_images_debug_backward
 output_images_debug_forward
 output_images_gnn_solver1
-output_images_gnn_solver1_old
+output_images_gnn_solver1_old_solver
 data
 lightning_logs
 
