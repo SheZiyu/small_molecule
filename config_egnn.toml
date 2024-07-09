@@ -1,0 +1,33 @@
+seed = [42, 43 ,44] # Shaded area reflects the uncertainty estimated by 3 random seeds
+
+pin_memory = true
+num_workers = 2
+batch_size = 12
+train_size = 0.7
+num_epochs = 5000
+num_splits = 3  # Number of cross-validation splits
+num_frames_to_process = 10000
+learning_rate = 0.0001
+decay = 0.995
+patience = 1000
+device0 = 0
+device1 = 1
+device2 = 2
+device3 = 3
+device = 'cpu'
+
+node_dim = 17
+vector_dim = 3
+edge_type_dim = 3
+edge_dim = 1
+cutoff = 1.5
+scale = 3
+scale_var = 2
+num_bins = 20
+
+directory_path = 'data/sys'
+data_dir = 'data/sys'
+
+
+
+
