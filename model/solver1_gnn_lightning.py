@@ -116,7 +116,6 @@ class DDPM(nn.Module):
         order=1,
         M=30,
         return_all=False,
-        update_edge=True,
         **kwargs
     ):
         """
@@ -160,7 +159,6 @@ class DDPM(nn.Module):
         order3,
         M=30,
         return_all=False,
-        update_edge=True,
         **kwargs
     ):
         """
@@ -484,7 +482,7 @@ class LitModel(L.LightningModule):
         with self.ema.average_parameters():
             loss = self.criterion(pred_eps, eps)
         # Log the validation loss
-        self.log("val_loss", loss, sync_dist=True)
+        self.log("val_loss", loss)
 
         return loss
 

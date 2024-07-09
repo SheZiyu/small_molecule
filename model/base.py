@@ -37,7 +37,7 @@ class MLP(nn.Module):
         __repr__(): Returns a string representation of the MLP object.
     '''
 
-    def __init__(self, hidden_size_list, cond_size_list=None, act=nn.ReLU(), iscond=True, noresidual=True, drop=0.1):
+    def __init__(self, hidden_size_list, cond_size_list=None, act=nn.ReLU(), is_cond=True, is_residual=False, drop=0.1):
         '''
         Initializes the MLP with specified layer sizes and activation function.
 
@@ -45,15 +45,15 @@ class MLP(nn.Module):
             hidden_size_list (list of int): Sizes of the input, hidden, and output layers.
             act (torch.nn.Module, optional): Activation function for the hidden layers.
                                               Default is None.
-            noresidual (bool, optional):
+            isresidual (bool, optional):
             drop (float)
         '''
         super().__init__()
         self.hidden_size_list = hidden_size_list
         self.cond_size_list = cond_size_list
         self.act = act
-        self.iscond = iscond
-        self.noresidual = noresidual
+        self.is_cond = is_cond
+        self.is_residual = is_residual
         self.drop = drop
         dropout = nn.Dropout(drop)
 
@@ -65,7 +65,7 @@ class MLP(nn.Module):
                 layers.append(dropout)
         self.mlp = nn.Sequential(*layers)
 
-        if iscond:
+        if is_cond:
             cond_layers = []
             for i in range(len(cond_size_list) - 1):
                 cond_layers.append(nn.Linear(cond_size_list[i], cond_size_list[i + 1]))
@@ -73,6 +73,7 @@ class MLP(nn.Module):
                     cond_layers.append(act)
                     cond_layers.append(dropout)
             self.cond_mlp = nn.Sequential(*cond_layers)
+            self.out = nn.Linear(hidden_size_list[-1] + cond_size_list[-1], hidden_size_list[-1])
 
         # self.apply(self._init_weights)
 
@@ -86,10 +87,11 @@ class MLP(nn.Module):
         Returns:
             torch.Tensor: The output tensor of the MLP after the forward pass.
         '''
-        x = self.mlp(x) + x if not self.noresidual else self.mlp(x)
-        if self.iscond:
-            cond = self.cond_mlp(cond) + cond if not self.noresidual else self.cond_mlp(cond)
-            x = x + cond
+        x = self.mlp(x) + x if self.is_residual else self.mlp(x)
+        if self.is_cond:
+            cond = self.cond_mlp(cond) + cond if self.is_residual else self.cond_mlp(cond)
+            x = torch.cat([x, cond], dim=-1)
+            x = self.out(x)
         return x
 
     def _init_weights(self, module):
@@ -110,11 +112,11 @@ class MLP(nn.Module):
             self.hidden_size_list,
             self.cond_size_list,
             self.act,
-            self.iscond,
-            self.noresidual,
+            self.is_cond,
+            self.is_residual,
             self.drop)
 
-def aggregate(edge_index, edge_attr, node_attr, reduce='sum', cat=False, residual=False):
+def aggregate(edge_index, edge_attr, node_attr, reduce='sum', is_cat=False, is_residual=False):
     '''
     :param edge_index: adjacency matrix of shape (2, num_edges)
     :param edge_attr: edge features of shape (num_edges, edge_dim)
@@ -126,14 +128,14 @@ def aggregate(edge_index, edge_attr, node_attr, reduce='sum', cat=False, residua
     '''
     j = edge_index[1]
     result = scatter(edge_attr, index=j, dim=0, dim_size=node_attr.size(0), reduce=reduce)
-    if cat:
+    if is_cat:
         result = torch.cat([result, node_attr], dim=-1) # [bn, edge_dim + node_dim]
-    if residual:
+    if is_residual:
         result += node_attr # [bn, edge_dim]
     return result
 
 class MessagePassingGNN(nn.Module):
-    def __init__(self, vector_dim, scalars_dim, hidden_dim, output_dim, norm=True):
+    def __init__(self, vector_dim, scalars_dim, hidden_dim, output_dim, is_norm=True):
         '''
         :param vector_dim:
         :param scalars_dim:
@@ -142,7 +144,7 @@ class MessagePassingGNN(nn.Module):
         :param norm: normalization of vector features
         '''
         super(MessagePassingGNN, self).__init__()
-        self.norm = norm
+        self.is_norm = is_norm
         self.mlp = MLP([vector_dim + scalars_dim, hidden_dim,
                         hidden_dim, output_dim],
                        [vector_dim, hidden_dim,
@@ -154,7 +156,7 @@ class MessagePassingGNN(nn.Module):
         :param scalars: scalar features, e.g., node features, edge features, of shape (num_edges, scalars_dim)
         :return: message scalar of shape (num_edges, output_dim)
         '''
-        if self.norm:
+        if self.is_norm:
             x = F.normalize(x, p=2, dim=-1)
             cond = F.normalize(cond, p=2, dim=-1)
         scalar = self.mlp(torch.cat([x, scalars], dim=-1), cond=cond)
@@ -180,7 +182,7 @@ class GNN_layer(nn.Module):
         self.vector_dim = vector_dim
         self.scalar_dim = scalar_dim
         self.messageNN = MessagePassingGNN(vector_dim=vector_dim*2, scalars_dim=scalars_dim, output_dim=message_dim,
-                                           hidden_dim=hidden_dim, norm=True)
+                                           hidden_dim=hidden_dim, is_norm=True)
         self.vectorNN = MLP([message_dim, hidden_dim,
                              hidden_dim, vector_dim],
                             [vector_dim*2, hidden_dim,
@@ -188,11 +190,11 @@ class GNN_layer(nn.Module):
                             )
         self.scalarNN = MLP([message_dim, hidden_dim,
                              hidden_dim, scalar_dim],
-                            iscond=False
+                            is_cond=False
                             )
         self.nodeNN = MLP([scalar_dim, hidden_dim,
                            hidden_dim, node_dim],
-                          iscond=False
+                          is_cond=False
                           )
 
     def forward(self, edge_index, edge_type, edge_attr, x, h, cond):
@@ -212,10 +214,10 @@ class GNN_layer(nn.Module):
         condij = torch.cat([cond[row], cond[col]], dim=-1)
         message = self.messageNN(xij, scalars=hij, cond=condij)  # [bm, message_dim]
         vector = self.vectorNN(message, cond=condij)  # [bm, vector_dim]
-        vector = x + aggregate(edge_index, vector, x, reduce='sum', cat=False, residual=False)  # [bn, vector_dim]
+        vector = cond + aggregate(edge_index, vector, x, reduce='sum', is_cat=False, is_residual=False)  # [bn, vector_dim]
 
         scalar = self.scalarNN(message)  # [bm, scalar_dim]
-        node_attr = self.nodeNN(aggregate(edge_index, scalar, h, reduce='sum', cat=False, residual=False))  # [bn, node_dim]
+        node_attr = self.nodeNN(aggregate(edge_index, scalar, h, reduce='sum',  is_cat=False, is_residual=False))  # [bn, node_dim]
         node_attr += h
         return vector, node_attr, cond
 
@@ -252,7 +254,7 @@ class GNN(nn.Module):
         return x, h, cond
 
 class MessagePassingEGNN(nn.Module):
-    def __init__(self, num_vec, vector_dim, scalars_dim, hidden_dim, output_dim, norm=True, scalar=True):
+    def __init__(self, num_vec, vector_dim, scalars_dim, hidden_dim, output_dim, is_norm=True, is_scalar=True):
         '''
         :param num_vec:
         :param scalars_dim:
@@ -265,9 +267,9 @@ class MessagePassingEGNN(nn.Module):
         self.num_vec = num_vec
         self.vector_dim = vector_dim
         self.scalars_dim = scalars_dim
-        self.norm = norm
+        self.is_norm = is_norm
 
-        if scalar:
+        if is_scalar:
             self.mlp = MLP([num_vec + scalars_dim, hidden_dim,
                             hidden_dim, output_dim],
                            [vector_dim, hidden_dim,
@@ -320,7 +322,7 @@ class EGNN_layer(nn.Module):
         self.edge_type_dim = edge_type_dim
         self.vector_dim = vector_dim
         self.scalar_dim = scalar_dim
-        self.messageNN = MessagePassingEGNN(vector_dim=vector_dim*2, scalars_dim=scalars_dim, output_dim=message_dim, num_vec=1, hidden_dim=hidden_dim, norm=True, scalar=True)
+        self.messageNN = MessagePassingEGNN(vector_dim=vector_dim*2, scalars_dim=scalars_dim, output_dim=message_dim, num_vec=1, hidden_dim=hidden_dim, is_norm=True, is_scalar=True)
         self.vectorNN = MLP([message_dim, hidden_dim,
                              hidden_dim, vector_dim],
                             [vector_dim*2, hidden_dim,
@@ -328,11 +330,11 @@ class EGNN_layer(nn.Module):
                             )
         self.scalarNN = MLP([message_dim, hidden_dim,
                              hidden_dim, scalar_dim],
-                            iscond=False
+                            is_cond=False
                             )
         self.nodeNN = MLP([scalar_dim, hidden_dim,
                            hidden_dim, node_dim],
-                          iscond=False
+                          is_cond=False
                           )
 
     def forward(self, edge_index, edge_type, edge_attr, x, h, cond):
@@ -352,10 +354,10 @@ class EGNN_layer(nn.Module):
         message = self.messageNN(xij, scalars=hij, cond=condij) # [bm, message_dim]
         assert xij.shape[-1] == self.vector_dim
         vector = xij * self.vectorNN(message, cond=condij) # [bm, vector_dim]
-        vector = x + aggregate(edge_index, vector, x, reduce='sum', cat=False, residual=False) # [bn, vector_dim]
+        vector = cond + aggregate(edge_index, vector, x, reduce='sum', is_cat=False, is_residual=False) # [bn, vector_dim]
 
         scalar = self.scalarNN(message) # [bm, scalar_dim]
-        node_attr = self.nodeNN(aggregate(edge_index, scalar, h, reduce='sum', cat=False, residual=False)) # [bn, node_dim]
+        node_attr = self.nodeNN(aggregate(edge_index, scalar, h, reduce='sum', is_cat=False, is_residual=False)) # [bn, node_dim]
         node_attr += h
         return vector, node_attr, cond
 
@@ -416,7 +418,7 @@ class FourierTimeEmbedding(nn.Module):
 
 class DynamicsGNN(nn.Module):
     def __init__(self, node_dim, edge_dim, edge_type_dim, vector_dim,
-                 model=GNN, num_layers=1,
+                 model=GNN, num_layers=8,
                  message_dim=8, hidden_dim=512, scalar_dim=16
                  ):
         super(DynamicsGNN, self).__init__()
@@ -425,7 +427,7 @@ class DynamicsGNN(nn.Module):
         self.model2 = model(num_layers, node_dim+hidden_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
         self.model3 = model(num_layers, node_dim+hidden_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
         # Sanity check
-        self.invariant_scalr = MLP([node_dim+hidden_dim, 1], iscond=False)
+        self.invariant_scalr = MLP([node_dim+hidden_dim, 1], is_cond=False)
 
     def forward(self, t, edge_index, edge_type, edge_attr, x, h, cond):
         t = self.time_embedding(t)
@@ -455,7 +457,7 @@ class DynamicsEGNN(nn.Module):
         self.model2 = model(num_layers, node_dim+hidden_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
         self.model3 = model(num_layers, node_dim+hidden_dim, edge_dim, edge_type_dim, message_dim, hidden_dim, vector_dim, scalar_dim)
         # Sanity check
-        self.invariant_scalr = MLP([node_dim+hidden_dim, 1], iscond=False)
+        self.invariant_scalr = MLP([node_dim+hidden_dim, 1], is_cond=False)
 
     def forward(self, t, edge_index, edge_type, edge_attr, x, h, cond):
         t = self.time_embedding(t)
@@ -464,7 +466,7 @@ class DynamicsEGNN(nn.Module):
         x, h, cond = self.model2(edge_index, edge_type, edge_attr, x, h, cond)
         x, h, cond = self.model3(edge_index, edge_type, edge_attr, x, h, cond)
         h = self.invariant_scalr(h)
-        return x, h
+        return x, hs
 
     def reset_parameters(self):
         # Custom logic to reset or initialize parameters

@@ -116,7 +116,6 @@ class DDPM(nn.Module):
         order=1,
         M=30,
         return_all=False,
-        update_edge=True,
         **kwargs
     ):
         """
@@ -160,7 +159,6 @@ class DDPM(nn.Module):
         order3,
         M=30,
         return_all=False,
-        update_edge=True,
         **kwargs
     ):
         """
@@ -208,7 +206,7 @@ class DDPM(nn.Module):
             return torch.stack(xs)
         else:
             return x
-
+        
     def solver1(self, x, t_im1, t_i, noise_net, **kwargs):
         """
         A solver function for the reverse denoising process, computing the next state.
@@ -517,7 +515,7 @@ class LitModel(L.LightningModule):
         with self.ema.average_parameters():
             loss = self.criterion(pred_eps, eps)
         # Log the validation loss
-        self.log("val_loss", loss, sync_dist=True)
+        self.log("val_loss", loss)
 
         return loss
 
@@ -569,7 +567,7 @@ if __name__ == "__main__":
 
     # Initialize Trainer with early stopping callback and model checkpoint callback
     trainer = L.Trainer(
-        devices=[4,5],
+        devices=6,
         accelerator="cuda",
         max_epochs=config["num_epochs"],
         callbacks=[early_stop_callback, checkpoint_callback],
