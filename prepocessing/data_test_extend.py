@@ -39,7 +39,7 @@ from prepocessing.preprocessing import parse_toml_file
 
 
 class DataAnalysis:
-    def __init__(self, directory_path, num_frames_to_process, selection='resname UNL', scaling=True, scale=2.0, align=True):
+    def __init__(self, directory_path, num_frames_to_process, selection='resname UNL', scaling=True, scale=7.0, align=True):
         self.directory_path = directory_path
         self.num_frames_to_process = num_frames_to_process
         self.selection = selection
