@@ -19,7 +19,7 @@ from torch_geometric.nn.pool import radius_graph
 from utils.auxiliary import augment_edge, extract_pdb_from_zip, write_combined_pdb
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data_test import TrajectoriesDataset_Efficient, generate_test_dataset
-from model.solver1_gnn_lightning import LitModel
+from model.gnn_lightning import LitModel
 
 if __name__ == '__main__':
     print(os.getcwd())

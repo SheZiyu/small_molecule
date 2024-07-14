@@ -113,7 +113,7 @@ def augment_edge_extend(data, edge_index, pos):
 
     # Concatenate edge vectors and edge lengths into edge_encoding
     # data.edge_encoding = torch.hstack([edge_vec, edge_len])
-    data.edge_attr = edge_len
+    data.edge_len = edge_len
     return data
 
 def extract_pdb_from_zip(zip_folder, target_name, output_folder):

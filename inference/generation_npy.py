@@ -21,7 +21,7 @@ from prepocessing.transforms import extend_to_radius_graph
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data_test import TrajectoriesDataset_Efficient, generate_test_dataset
 from utils.auxiliary import radius_graph_custom, augment_edge, extract_pdb_from_zip, write_combined_pdb
-from model.solver1_gnn_lightning import LitModel
+from model.gnn_lightning import LitModel
 
 
 if __name__ == '__main__':

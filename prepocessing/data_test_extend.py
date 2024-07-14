@@ -307,9 +307,6 @@ class TrajectoriesDataset_Efficient(Dataset):
         # Load coordinates array
         rmsf = calculate_rmsf(np.array(group[coordinates_array_key]))
         coordinates_array = np.array(group[coordinates_array_key][frame_idx])
-        coordinates_array_plus1 = np.array(group[coordinates_array_key][frame_idx + 1])
-        coordinates_array = torch.tensor(coordinates_array, dtype=torch.float)
-        coordinates_array_plus1 = torch.tensor(coordinates_array_plus1, dtype=torch.float)
 
         # Load one-hot trajectory array
         one_hot_traj = np.array(group[one_hot_traj_key])
@@ -349,8 +346,16 @@ class TrajectoriesDataset_Efficient(Dataset):
         #     self.cutoff * self.scale,
         #     torch.ones(coordinates_array_plus1.shape[0]))
      
+        if frame_idx < self.number_frames - 1:
+            coordinates_array_plus1 = np.array(group[coordinates_array_key][frame_idx + 1])
+            # coordinates_array_plus1 = torch.tensor(coordinates_array_plus1, dtype=torch.float)
+            dd, dx, dy, dz = calculate_displacement_xyz(coordinates_array, coordinates_array_plus1)
+        else:
+            d_shape = (coordinates_array.shape[0], )
+            dd, dx, dy, dz = np.zeros_like(coordinates_array), np.zeros_like(d_shape), np.zeros_like(d_shape), np.zeros_like(d_shape)
+        coordinates_array = torch.tensor(coordinates_array, dtype=torch.float)
+        dd = torch.tensor(dd, dtype=torch.float)
         frame_idx = torch.tensor(frame_idx).repeat([coordinates_array.shape[0], 1])
-        frame_idx_plus1 = frame_idx + 1
 
         data = Data(
             pos=coordinates_array,
@@ -360,28 +365,19 @@ class TrajectoriesDataset_Efficient(Dataset):
             traj_idx=system_idx,
             frame_idx=frame_idx,
             atoms_num=atoms_num,
+            dd=dd,
+            dx=dx,
+            dy=dy,
+            dz=dz,
             name=np.array(group[name_key]),
             rmsf=rmsf
         )
         # data = self.augment_edge(data)
 
-        data_plus1 = Data(
-            pos=coordinates_array_plus1,
-            x=one_hot_traj,
-            edge_index=covalent_edge_index,
-            edge_type=covalent_edge_type,
-            traj_idx=system_idx,
-            frame_idx=frame_idx_plus1,
-            atoms_num=atoms_num,
-            name=np.array(group[name_key]),
-            rmsf = rmsf
-        )
-        # data_plus1 = self.augment_edge(data_plus1)
-
         if self.augment:
-            return self.random_rotate(data), self.random_rotate(data_plus1)
+            return self.random_rotate(data) 
         else:
-            return data, data_plus1
+            return data 
 
     def random_rotate(self, data):
         R = torch.tensor(Rotation.random().as_matrix(), dtype=torch.float, device=data.pos.device)

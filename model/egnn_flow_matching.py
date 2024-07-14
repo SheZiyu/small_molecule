@@ -1,12 +1,131 @@
 import torch 
 import torch.nn as nn
 from torch_scatter import scatter_add, scatter_mean
+from torch_geometric.nn.pool import radius_graph
 
 # env: equivariant_gflownet5
 from math import pi as PI
 
 from prepocessing.transforms import extend_to_radius_graph
 from model.base import FourierTimeEmbedding
+
+
+# def extend_to_radius_graph(
+#     coords,
+#     edge_index,
+#     edge_type,
+#     cutoff,
+#     node2graph,
+#     unspecified_type_number=0,
+# ):
+#     """Add further edges based on distance. Also include edge information
+#
+#     Args:
+#         coords: coordinates of the atoms
+#         edge_index: source and destination of the edges
+#         edge_type: type of the edges
+#         cutoff: an edge will be set, if the distance between the atoms is smaller than the cutoff
+#         node2graph: specifies which of the batched nodes belong to which graph
+#         unspecified_type_number: This is the edge type that is assigned to the edges constructed from radius. Defaults to 0.
+#
+#     Returns:
+#         new_edge_index: the updated edge sourse/destination tensor
+#         new_edge_type: the type of the edges
+#     """
+#     assert edge_type.dim() == 1
+#     number_nodes = coords.size(0)
+#     bgraph_adj = torch.sparse_coo_tensor(
+#         edge_index, edge_type, torch.Size([number_nodes, number_nodes])
+#     )
+#     rgraph_edge_index = radius_graph(coords, r=cutoff, batch=node2graph)  # (2, E_r)
+#     # radius_graph(coords.to(5), r=cutoff, batch=node2graph.to(5))
+#
+#     rgraph_adj = torch.sparse_coo_tensor(
+#         rgraph_edge_index,
+#         torch.ones(rgraph_edge_index.size(1)).long().to(coords.device)
+#         * unspecified_type_number,
+#         torch.Size([number_nodes, number_nodes]),
+#     )
+#     composed_adj = (bgraph_adj + rgraph_adj).coalesce()  # Sparse (N, N, T)
+#     new_edge_index = composed_adj.indices()
+#     new_edge_type = composed_adj.values().long()
+#     return new_edge_index, new_edge_type
+def extend_to_radius_graph(
+        coords_1,
+        coords_2,
+        edge_index,
+        edge_type,
+        cutoff,
+        node2graph,
+        specified_type_number=3,
+        unspecified_type_number=0,
+):
+    """Add further edges based on distance. Also include edge information
+
+    Args:
+        coords_1: coordinates of the first set of nodes
+        coords_2: coordinates of the second set of nodes
+        edge_index: source and destination of the edges
+        edge_type: type of the edges
+        cutoff: an edge will be set if the distance between the atoms is smaller than the cutoff
+        node2graph: specifies which of the batched nodes belong to which graph
+        unspecified_type_number: This is the edge type that is assigned to the edges constructed from radius. Defaults to 0.
+        specified_type_number: The edge type that is assigned to the edges connecting coords_1 and coords_2. Defaults to 3.
+
+    Returns:
+        new_edge_index: the updated edge source/destination tensor
+        new_edge_type: the type of the edges
+    """
+    assert edge_type.dim() == 1
+    device = coords_1.device
+    coords_2 = coords_2.to(device)
+    edge_index = edge_index.to(device)
+    edge_type = edge_type.to(device)
+    node2graph = node2graph.to(device)
+
+    number_nodes_1 = coords_1.size(0)
+    number_nodes_2 = coords_2.size(0)
+    total_nodes = number_nodes_1 + number_nodes_2
+
+    # Combine the coordinates
+    combined_coords = torch.cat([coords_1, coords_2], dim=0)
+
+    # Extend the node2graph tensor
+    extended_node2graph = torch.cat([node2graph, node2graph], dim=0).to(device)
+
+    # Create new indices for connecting coords_1 with coords_2
+    connect_indices_1 = torch.arange(number_nodes_1, device=device)
+    connect_indices_2 = torch.arange(number_nodes_2, device=device) + number_nodes_1
+    extended_edge_index = torch.stack([connect_indices_1, connect_indices_2], dim=0)
+
+    # Edge types for the new connections
+    extended_edge_type = torch.full((number_nodes_1,), specified_type_number, dtype=torch.long, device=device)
+
+    # Combine with existing edges
+    combined_edge_index = torch.cat([edge_index, extended_edge_index], dim=1)
+    combined_edge_type = torch.cat([edge_type, extended_edge_type], dim=0)
+
+    # Create sparse adjacency matrix for existing and extended edges
+    bgraph_adj = torch.sparse_coo_tensor(
+        combined_edge_index, combined_edge_type, torch.Size([total_nodes, total_nodes]), device=device
+    )
+
+    # Create radius graph for the combined coordinates
+    rgraph_edge_index = radius_graph(combined_coords, r=cutoff, batch=extended_node2graph)
+    rgraph_adj = torch.sparse_coo_tensor(
+        rgraph_edge_index,
+        torch.ones(rgraph_edge_index.size(1), device=device).long()
+        * unspecified_type_number,
+        torch.Size([total_nodes, total_nodes]),
+        device=device
+    )
+
+    # Combine adjacency matrices
+    composed_adj = (bgraph_adj + rgraph_adj).coalesce()  # Sparse (N, N, T)
+    new_edge_index = composed_adj.indices()
+    new_edge_type = composed_adj.values().long()
+
+    return new_edge_index, new_edge_type
 
 
 def unsorted_segment_mean(data, segment_ids, num_segments):
@@ -27,6 +146,7 @@ def unsorted_segment_sum(data, segment_ids, num_segments):
     result.scatter_add_(0, segment_ids, data)
     return result
 
+
 class E_GCL(nn.Module):
     """Graph Neural Net with global state and fixed number of nodes per graph.
     Args:
@@ -37,20 +157,20 @@ class E_GCL(nn.Module):
     """
 
     def __init__(
-        self,
-        input_nf,
-        output_nf,
-        hidden_nf,
-        edges_in_d=3,
-        nodes_att_dim=0,
-        act_fn=nn.SiLU(),
-        recurrent=True,
-        attention=False,
-        clamp=False,
-        norm_diff=True,
-        tanh=False,
-        coords_range=1,
-        agg="sum",
+            self,
+            input_nf,
+            output_nf,
+            hidden_nf,
+            edges_in_d=4,
+            nodes_att_dim=0,
+            act_fn=nn.SiLU(),
+            recurrent=True,
+            attention=False,
+            clamp=False,
+            norm_diff=True,
+            tanh=False,
+            coords_range=1,
+            agg="sum",
     ):
         super(E_GCL, self).__init__()
         input_edge = input_nf * 2  # why *2?
@@ -97,14 +217,14 @@ class E_GCL(nn.Module):
         # if recurrent:
         #    self.gru = nn.GRUCell(hidden_nf, hidden_nf)
 
-    def edge_model(self, source, target, radial, edge_attr, edge_mask):
-        # print("edge_model", radial, edge_attr)
-        if edge_attr is None:  # Unused.
+    def edge_model(self, source, target, radial, edge_type, edge_mask):
+        # print("edge_model", radial, edge_type)
+        if edge_type is None:  # Unused.
             out = torch.cat([source, target, radial], dim=1)
         else:
             out = torch.cat(
-                [source, target, radial, edge_attr], dim=1
-            )  # own: edge_attr==radial
+                [source, target, radial, edge_type], dim=1
+            )  # own: edge_type==radial
         out = self.edge_mlp(out)
 
         if self.attention:
@@ -129,7 +249,7 @@ class E_GCL(nn.Module):
         return out, agg
 
     def coord_model(
-        self, coord, edge_index, coord_diff, radial, edge_feat, node_mask, edge_mask
+            self, coord, edge_index, coord_diff, radial, edge_feat, node_mask, edge_mask
     ):
         # print("coord_model", coord_diff, radial, edge_feat)
         row, col = edge_index
@@ -160,14 +280,14 @@ class E_GCL(nn.Module):
         return coord
 
     def forward(
-        self,
-        h,
-        edge_index,
-        coord,
-        edge_attr=None,
-        node_attr=None,
-        node_mask=None,
-        edge_mask=None,
+            self,
+            h,
+            edge_index,
+            coord,
+            edge_type=None,
+            node_attr=None,
+            node_mask=None,
+            edge_mask=None,
     ):
         src, dst = edge_index
         radial, coord_diff = self.coord2radial(
@@ -175,7 +295,7 @@ class E_GCL(nn.Module):
         )  # own: radial is the distance squared and coord_diff is the normalized difference vector
 
         edge_feat = self.edge_model(
-            h[src], h[dst], radial, edge_attr, edge_mask
+            h[src], h[dst], radial, edge_type, edge_mask
         )  # in the egnn, this is (3)
         coord = self.coord_model(
             coord, edge_index, coord_diff, radial, edge_feat, node_mask, edge_mask
@@ -207,21 +327,21 @@ class E_GCL(nn.Module):
 
 class EGNN(nn.Module):
     def __init__(
-        self,
-        in_node_nf,
-        in_edge_nf,
-        # hidden_nf=128,
-        hidden_nf=64,
-        device="cpu",
-        act_fn=nn.SiLU(),
-        n_layers=5,
-        recurrent=True,
-        attention=True,
-        norm_diff=True,
-        out_node_nf=None,
-        tanh=False,
-        coords_range=15,
-        agg="sum",
+            self,
+            in_node_nf,
+            in_edge_nf,
+            # hidden_nf=128,
+            hidden_nf=64,
+            device="cpu",
+            act_fn=nn.SiLU(),
+            n_layers=5,
+            recurrent=True,
+            attention=True,
+            norm_diff=True,
+            out_node_nf=None,
+            tanh=False,
+            coords_range=15,
+            agg="sum",
     ):
         """EGNN model
 
@@ -277,45 +397,49 @@ class EGNN(nn.Module):
         self.to(self.device)
 
     def forward(
-        self,
-        h_ininitial,
-        x_mean_free,
-        edges,
-        node2graph,
-        edge_attr=None,
-        node_mask=None,
-        edge_mask=None,
-        extend_radius=True,
+            self,
+            h_ininitial,
+            x_mean_free_1,
+            x_mean_free_2,
+            edges,
+            node2graph,
+            edge_type=None,
+            node_mask=None,
+            edge_mask=None,
+            extend_radius=True,
     ):
         h = self.embedding(h_ininitial)
+        h = torch.cat([h, h], dim=0)
         if extend_radius:
             new_edge_index, new_edge_type = extend_to_radius_graph(
-                x_mean_free,
+                x_mean_free_1,
+                x_mean_free_2,
                 edges,
-                edge_attr,
-                2.0,
+                edge_type,
+                14,
                 node2graph,
-                unspecified_type_number=0,
             )
             # edges = create_distance_edges_within_graphs(x, batch2graph, 10.0)
-        edge_type_one_hot = torch.nn.functional.one_hot(new_edge_type, num_classes=3)
+        edge_type_one_hot = torch.nn.functional.one_hot(new_edge_type, num_classes=4)
+        x_mean_free = torch.cat([x_mean_free_1, x_mean_free_2], dim=0)
         for i in range(0, self.n_layers):
             h, x_mean_free, _ = self._modules["gcl_%d" % i](
                 h,
                 new_edge_index,
                 x_mean_free,
-                edge_attr=edge_type_one_hot,
+                edge_type=edge_type_one_hot,
                 node_mask=node_mask,
                 edge_mask=edge_mask,  # what is the purpose of edge_mask?
             )
+            x_mean_free = torch.cat([x_mean_free_1, x_mean_free[x_mean_free_1.shape[0]:, :]], dim=0)
         h = self.embedding_out(h)
 
         # Important, the bias of the last linear might be non-zero
         if node_mask is not None:
             h = h * node_mask
-        return h, x_mean_free
-    
-    
+        return h[x_mean_free_1.shape[0]:, :], x_mean_free[x_mean_free_1.shape[0]:, :]
+
+
 def create_distance_edges_within_graphs(coords, node2graph, cutoff_radius):
     """
     Calculates distances between points withing a graph and returns edges
@@ -367,16 +491,13 @@ class DynamicsEGNN(nn.Module):
     def __init__(self, in_node_nf, in_edge_nf, hidden_nf=64, model=EGNN):
         super(DynamicsEGNN, self).__init__()
         self.time_embedding = FourierTimeEmbedding(embed_dim=hidden_nf, input_dim=1)
-        self.model1 = model(in_node_nf+hidden_nf, in_edge_nf, hidden_nf)
-        self.model2 = model(in_node_nf, in_edge_nf, hidden_nf)
-        self.model3 = model(in_node_nf, in_edge_nf, hidden_nf)
-    
+        self.model1 = model(in_node_nf + hidden_nf, in_edge_nf, hidden_nf)
 
-    def forward(self, t, h, x, edge_index, node2graph, edge_attr=None):
+    def forward(self, t, h, x1, x2, edge_index, node2graph, edge_type=None):
         t = self.time_embedding(t)
-        h = torch.cat([t, h], dim=-1)
-        h, x  = self.model1(h, x, edge_index, node2graph, edge_attr)
-        # print(h.shape) 
+        h = torch.cat([h, t], dim=-1)
+        h, x = self.model1(h, x1, x2, edge_index, node2graph, edge_type)
+        # print(h.shape)
         # print(x.shape)
         return x, h
 
@@ -385,3 +506,4 @@ class DynamicsEGNN(nn.Module):
         for module in self.children():
             if hasattr(module, 'reset_parameters'):
                 module.reset_parameters()
+

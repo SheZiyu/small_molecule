@@ -18,7 +18,7 @@ from MDAnalysis.analysis import rms, align
 from utils.auxiliary import pairwise_distances, calculate_displacement_xyz, calculate_rmsf
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data_test import TrajectoriesDataset_Efficient, generate_test_dataset
-from model.solver1_gnn_lightning import LitModel
+from model.gnn_lightning import LitModel
 
 def process_folder(folder, folder_path):
     pdb_files = [file for file in os.listdir(folder_path) if file == 'gt_1a10A.pdb']

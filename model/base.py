@@ -214,7 +214,7 @@ class GNN_layer(nn.Module):
         condij = torch.cat([cond[row], cond[col]], dim=-1)
         message = self.messageNN(xij, scalars=hij, cond=condij)  # [bm, message_dim]
         vector = self.vectorNN(message, cond=condij)  # [bm, vector_dim]
-        vector = cond + aggregate(edge_index, vector, x, reduce='sum', is_cat=False, is_residual=False)  # [bn, vector_dim]
+        vector = x + aggregate(edge_index, vector, x, reduce='sum', is_cat=False, is_residual=False)  # [bn, vector_dim]
 
         scalar = self.scalarNN(message)  # [bm, scalar_dim]
         node_attr = self.nodeNN(aggregate(edge_index, scalar, h, reduce='sum',  is_cat=False, is_residual=False))  # [bn, node_dim]
@@ -354,7 +354,7 @@ class EGNN_layer(nn.Module):
         message = self.messageNN(xij, scalars=hij, cond=condij) # [bm, message_dim]
         assert xij.shape[-1] == self.vector_dim
         vector = xij * self.vectorNN(message, cond=condij) # [bm, vector_dim]
-        vector = cond + aggregate(edge_index, vector, x, reduce='sum', is_cat=False, is_residual=False) # [bn, vector_dim]
+        vector = x + aggregate(edge_index, vector, x, reduce='sum', is_cat=False, is_residual=False) # [bn, vector_dim]
 
         scalar = self.scalarNN(message) # [bm, scalar_dim]
         node_attr = self.nodeNN(aggregate(edge_index, scalar, h, reduce='sum', is_cat=False, is_residual=False)) # [bn, node_dim]
@@ -466,7 +466,7 @@ class DynamicsEGNN(nn.Module):
         x, h, cond = self.model2(edge_index, edge_type, edge_attr, x, h, cond)
         x, h, cond = self.model3(edge_index, edge_type, edge_attr, x, h, cond)
         h = self.invariant_scalr(h)
-        return x, hs
+        return x, h
 
     def reset_parameters(self):
         # Custom logic to reset or initialize parameters
