@@ -398,19 +398,19 @@ class LitModel(L.LightningModule):
                 graph_indices = (batch.batch == graph_idx).nonzero(as_tuple=True)[0]
                 t_assigned[graph_indices] = t[i]
             t_assigned = t_assigned[:, None]
-            dx, eps = self.dpm.forward_noise(batch.dd, t_assigned)
+            noised_dd, eps = self.dpm.forward_noise(batch.dd, t_assigned)
 
-        pred_eps, h = self.model(
+        pred_perturbed_nodes, h = self.model(
             t=t_assigned,
             h=batch.x,
-            x1=batch.pos,
-            x2=batch.pos+dx,
+            original_nodes=batch.pos,
+            perturbed_nodes=batch.pos + noised_dd,
             edge_index=batch.edge_index,
             node2graph=batch.batch,
             edge_type=batch.edge_type
         )
 
-        loss = self.criterion(pred_eps, eps)
+        loss = self.criterion(pred_perturbed_nodes - batch.pos, eps)
         self.log('train_loss', loss)
         self.log('learning_rate', self.optimizer.param_groups[0]['lr'])
 
@@ -429,13 +429,13 @@ class LitModel(L.LightningModule):
             graph_indices = (batch.batch == graph_idx).nonzero(as_tuple=True)[0]
             t_assigned[graph_indices] = t[i]
         t_assigned = t_assigned[:, None]
-        dx, eps = self.dpm.forward_noise(batch.dd, t_assigned)
+        noised_dd, eps = self.dpm.forward_noise(batch.dd, t_assigned)
 
-        pred_eps, h = self.model(
+        pred_perturbed_nodes, h = self.model(
             t=t_assigned,
             h=batch.x,
-            x1=batch.pos,
-            x2=batch.pos+dx,
+            original_nodes=batch.pos,
+            perturbed_nodes=batch.pos + noised_dd,
             edge_index=batch.edge_index,
             node2graph=batch.batch,
             edge_type=batch.edge_type
@@ -444,7 +444,7 @@ class LitModel(L.LightningModule):
         # Compute loss
         with self.ema.average_parameters():
             # loss = self.criterion(transformed_graphs, target_graphs.pos)
-            loss = self.criterion(pred_eps, eps)
+            loss = self.criterion(pred_perturbed_nodes - batch.pos, eps)
         # Log the validation loss
         self.log('val_loss', loss)
 

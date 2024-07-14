@@ -399,8 +399,8 @@ class EGNN(nn.Module):
     def forward(
             self,
             h_ininitial,
-            x_mean_free_1,
-            x_mean_free_2,
+            original_nodes,
+            perturbed_nodes,
             edges,
             node2graph,
             edge_type=None,
@@ -412,8 +412,8 @@ class EGNN(nn.Module):
         h = torch.cat([h, h], dim=0)
         if extend_radius:
             new_edge_index, new_edge_type = extend_to_radius_graph(
-                x_mean_free_1,
-                x_mean_free_2,
+                original_nodes,
+                perturbed_nodes,
                 edges,
                 edge_type,
                 14,
@@ -421,23 +421,23 @@ class EGNN(nn.Module):
             )
             # edges = create_distance_edges_within_graphs(x, batch2graph, 10.0)
         edge_type_one_hot = torch.nn.functional.one_hot(new_edge_type, num_classes=4)
-        x_mean_free = torch.cat([x_mean_free_1, x_mean_free_2], dim=0)
+        x = torch.cat([original_nodes, perturbed_nodes], dim=0)
         for i in range(0, self.n_layers):
-            h, x_mean_free, _ = self._modules["gcl_%d" % i](
+            h, x, _ = self._modules["gcl_%d" % i](
                 h,
                 new_edge_index,
-                x_mean_free,
+                x,
                 edge_type=edge_type_one_hot,
                 node_mask=node_mask,
                 edge_mask=edge_mask,  # what is the purpose of edge_mask?
             )
-            x_mean_free = torch.cat([x_mean_free_1, x_mean_free[x_mean_free_1.shape[0]:, :]], dim=0)
+            x = torch.cat([original_nodes, x[original_nodes.shape[0]:, :]], dim=0)
         h = self.embedding_out(h)
 
         # Important, the bias of the last linear might be non-zero
         if node_mask is not None:
             h = h * node_mask
-        return h[x_mean_free_1.shape[0]:, :], x_mean_free[x_mean_free_1.shape[0]:, :]
+        return h[original_nodes.shape[0]:, :], x[original_nodes.shape[0]:, :]
 
 
 def create_distance_edges_within_graphs(coords, node2graph, cutoff_radius):
@@ -493,10 +493,10 @@ class DynamicsEGNN(nn.Module):
         self.time_embedding = FourierTimeEmbedding(embed_dim=hidden_nf, input_dim=1)
         self.model1 = model(in_node_nf + hidden_nf, in_edge_nf, hidden_nf)
 
-    def forward(self, t, h, x1, x2, edge_index, node2graph, edge_type=None):
+    def forward(self, t, h,original_nodes, perturbed_nodes, edge_index, node2graph, edge_type=None):
         t = self.time_embedding(t)
         h = torch.cat([h, t], dim=-1)
-        h, x = self.model1(h, x1, x2, edge_index, node2graph, edge_type)
+        h, x = self.model1(h, original_nodes, perturbed_nodes, edge_index, node2graph, edge_type)
         # print(h.shape)
         # print(x.shape)
         return x, h
