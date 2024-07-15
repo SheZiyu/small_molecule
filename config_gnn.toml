@@ -16,7 +16,7 @@ device2 = 2
 device3 = 3
 device = 'cpu'
 
-node_dim = 17
+node_dim = 18
 vector_dim = 3
 edge_type_dim = 4
 edge_dim = 1

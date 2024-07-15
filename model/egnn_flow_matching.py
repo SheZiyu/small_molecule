@@ -9,6 +9,7 @@ from math import pi as PI
 from prepocessing.transforms import extend_to_radius_graph
 from model.base import FourierTimeEmbedding
 
+# from small_sys_gnn.data.data_extend import TrajectoriesDataset_Efficient
 
 # def extend_to_radius_graph(
 #     coords,
@@ -50,6 +51,7 @@ from model.base import FourierTimeEmbedding
 #     new_edge_index = composed_adj.indices()
 #     new_edge_type = composed_adj.values().long()
 #     return new_edge_index, new_edge_type
+
 def extend_to_radius_graph(
         coords_1,
         coords_2,
@@ -332,7 +334,7 @@ class EGNN(nn.Module):
             in_edge_nf,
             # hidden_nf=128,
             hidden_nf=64,
-            device="cpu",
+            # device="cpu",
             act_fn=nn.SiLU(),
             n_layers=5,
             recurrent=True,
@@ -366,7 +368,7 @@ class EGNN(nn.Module):
         if out_node_nf is None:
             out_node_nf = in_node_nf
         self.hidden_nf = hidden_nf
-        self.device = device
+        # self.device = device
         self.n_layers = n_layers
         self.coords_range_layer = float(coords_range) / self.n_layers
         if agg == "mean":
@@ -394,11 +396,11 @@ class EGNN(nn.Module):
                 ),
             )
 
-        self.to(self.device)
+        # self.to(self.device)
 
     def forward(
             self,
-            h_ininitial,
+            h_initial,
             original_nodes,
             perturbed_nodes,
             edges,
@@ -408,8 +410,13 @@ class EGNN(nn.Module):
             edge_mask=None,
             extend_radius=True,
     ):
-        h = self.embedding(h_ininitial)
-        h = torch.cat([h, h], dim=0)
+
+        original_features = torch.cat([h_initial, 7*torch.ones([h_initial.size(0), 1], device=h_initial.device)], dim=1)
+        perturbed_features = torch.cat([h_initial, -7*torch.ones([h_initial.size(0), 1], device=h_initial.device)], dim=1)
+        h = torch.cat([original_features, perturbed_features], dim=0)
+        h = self.embedding(h)
+        # print(h)
+
         if extend_radius:
             new_edge_index, new_edge_type = extend_to_radius_graph(
                 original_nodes,
@@ -493,7 +500,7 @@ class DynamicsEGNN(nn.Module):
         self.time_embedding = FourierTimeEmbedding(embed_dim=hidden_nf, input_dim=1)
         self.model1 = model(in_node_nf + hidden_nf, in_edge_nf, hidden_nf)
 
-    def forward(self, t, h,original_nodes, perturbed_nodes, edge_index, node2graph, edge_type=None):
+    def forward(self, t, h, original_nodes, perturbed_nodes, edge_index, node2graph, edge_type=None):
         t = self.time_embedding(t)
         h = torch.cat([h, t], dim=-1)
         h, x = self.model1(h, original_nodes, perturbed_nodes, edge_index, node2graph, edge_type)
