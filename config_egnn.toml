@@ -1,7 +1,7 @@
 seed = [42, 43 ,44] # Shaded area reflects the uncertainty estimated by 3 random seeds
 
 pin_memory = true
-num_workers = 2
+num_workers = 1
 batch_size = 12
 train_size = 0.7
 num_epochs = 5000
