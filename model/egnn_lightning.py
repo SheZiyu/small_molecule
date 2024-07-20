@@ -465,14 +465,14 @@ class LitModel(L.LightningModule):
         return loss
 
     def training_step(self, batch):
-        loss=forward(self, batch)
+        loss = self.forward(batch)
         self.log("train_loss", loss)
         self.log("learning_rate", self.optimizer.param_groups[0]["lr"])
         return loss
 
     def validation_step(self, batch):
         with self.ema.average_parameters():
-            loss=forward(self, batch)
+            loss = self.forward(batch)
         self.log("val_loss", loss)
         return loss
 
