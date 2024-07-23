@@ -447,7 +447,7 @@ class LitModel(L.LightningModule):
             t = self.dpm.t_lambda(lambdas)
             t_assigned = t.to(self.device)[batch.batch]
             noised_dd, eps = self.dpm.forward_noise(batch.dd, t_assigned)
-        pred_perturbed_nodes, h = self.model(
+        pred_perturbed_nodes = self.model(
             t=t_assigned,
             h=batch.x,
             original_nodes=batch.pos,
@@ -456,7 +456,7 @@ class LitModel(L.LightningModule):
             node2graph=batch.batch,
             edge_type=batch.edge_type,
         )
-        loss = self.criterion(pred_perturbed_nodes - batch.pos, eps)
+        loss = self.criterion(pred_perturbed_nodes - batch.pos, batch.dd - noised_dd)
         return loss
 
     def training_step(self, batch):
@@ -466,7 +466,7 @@ class LitModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch):
-        #with self.ema.average_parameters():
+        # with self.ema.average_parameters():
         loss = self.forward(batch)
         self.log("val_loss", loss)
         return loss

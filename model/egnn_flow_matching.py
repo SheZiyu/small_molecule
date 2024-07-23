@@ -416,7 +416,6 @@ class EGNN(nn.Module):
         edge_type=None,
         node_mask=None,
         edge_mask=None,
-        extend_radius=True,
     ):
 
         original_features = torch.cat(
@@ -429,36 +428,37 @@ class EGNN(nn.Module):
         )
         h = torch.cat([original_features, perturbed_features], dim=0)
         h = self.embedding(h)
-        # print(h)
-
-        if extend_radius:
-            new_edge_index, new_edge_type = extend_to_radius_graph(
-                original_nodes,
-                perturbed_nodes,
-                edges,
-                edge_type,
-                14,
-                node2graph,
-            )
-            # edges = create_distance_edges_within_graphs(x, batch2graph, 10.0)
+        new_edge_index, new_edge_type = extend_to_radius_graph(
+            original_nodes,
+            perturbed_nodes,
+            edges,
+            edge_type,
+            14,
+            node2graph,
+        )
         edge_type_one_hot = torch.nn.functional.one_hot(new_edge_type, num_classes=4)
-        x = torch.cat([original_nodes, perturbed_nodes], dim=0)
+        node_coordinates = torch.cat([original_nodes, perturbed_nodes], dim=0)
         for i in range(0, self.n_layers):
-            h, x, _ = self._modules["gcl_%d" % i](
+            h, node_coordinates, _ = self._modules["gcl_%d" % i](
                 h,
                 new_edge_index,
-                x,
+                node_coordinates,
                 edge_type=edge_type_one_hot,
                 node_mask=node_mask,
                 edge_mask=edge_mask,  # what is the purpose of edge_mask?
             )
-            x = torch.cat([original_nodes, x[original_nodes.shape[0] :, :]], dim=0)
+            node_coordinates = torch.cat(
+                [original_nodes, node_coordinates[original_nodes.shape[0] :]], dim=0
+            )
         h = self.embedding_out(h)
 
         # Important, the bias of the last linear might be non-zero
         if node_mask is not None:
             h = h * node_mask
-        return h[original_nodes.shape[0] :, :], x[original_nodes.shape[0] :, :]
+        return (
+            h[original_nodes.shape[0] :, :],
+            node_coordinates[original_nodes.shape[0] :, :],
+        )
 
 
 def create_distance_edges_within_graphs(coords, node2graph, cutoff_radius):
@@ -526,12 +526,10 @@ class DynamicsEGNN(nn.Module):
     ):
         t = self.time_embedding(t)
         h = torch.cat([h, t], dim=-1)
-        h, x = self.model1(
+        h, perturbed_nodes_updated = self.model1(
             h, original_nodes, perturbed_nodes, edge_index, node2graph, edge_type
         )
-        # print(h.shape)
-        # print(x.shape)
-        return x, h
+        return perturbed_nodes_updated
 
     def reset_parameters(self):
         # Custom logic to reset or initialize parameters
