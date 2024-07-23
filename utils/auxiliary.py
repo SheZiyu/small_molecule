@@ -175,23 +175,21 @@ def write_combined_pdb(original_pdb, new_coordinates, output_file):
 
     print(f"Finished writing PDB file: {output_file}")
 
-
 def set_seed(seed=42):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # if you are using CUDA
 
-
-def get_optimizer(model, name="adam", **kwargs):
+def get_optimizer(model, name='adam', **kwargs):
     """Get optimizer by name and parameters from model"""
     parameters = filter(lambda p: p.requires_grad, model.parameters())
     name = name.lower()
     if name == "adam":
         return torch.optim.Adam(parameters, **kwargs)
-    elif name == "sgd":
+    elif name == 'sgd':
         return torch.optim.SGD(parameters, **kwargs)
-    elif name == "adadelta":
+    elif name == 'adadelta':
         return torch.optim.Adadelta(parameters, **kwargs)
-    elif name == "adagrad":
+    elif name == 'adagrad':
         return torch.optim.Adagrad(parameters, **kwargs)
     else:
-        raise NotImplementedError("Optimizer not supported: %s" % name)
+        raise NotImplementedError('Optimizer not supported: %s' % name)

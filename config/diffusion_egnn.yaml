@@ -1,7 +1,7 @@
 name: diffusion_egnn
 pin_memory: true
 num_workers: 1
-batch_size: 12
+batch_size: 200
 train_size: 0.7
 num_epochs: 5000
 num_splits: 3  # Number of cross-validation splits
@@ -24,4 +24,4 @@ data_dir: 'data/sys'
 resume_path:
 load_checkpoint: False
 repository_location: /home/florian/Repos/small_molecule
-do_validation: true  # Flag to control validation
+do_validation: false  # Flag to control validation
