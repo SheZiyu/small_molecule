@@ -1,11 +1,11 @@
-import torch 
+import torch
 import torch.nn as nn
 from torch_scatter import scatter_add, scatter_mean
 from torch_geometric.nn.pool import radius_graph
 
 # env: equivariant_gflownet5
 from math import pi as PI
-
+from utils.auxiliary import radius_graph_custom
 from prepocessing.transforms import extend_to_radius_graph
 from model.base import FourierTimeEmbedding
 
@@ -52,15 +52,16 @@ from model.base import FourierTimeEmbedding
 #     new_edge_type = composed_adj.values().long()
 #     return new_edge_index, new_edge_type
 
+
 def extend_to_radius_graph(
-        coords_1,
-        coords_2,
-        edge_index,
-        edge_type,
-        cutoff,
-        node2graph,
-        specified_type_number=3,
-        unspecified_type_number=0,
+    coords_1,
+    coords_2,
+    edge_index,
+    edge_type,
+    cutoff,
+    node2graph,
+    specified_type_number=3,
+    unspecified_type_number=0,
 ):
     """Add further edges based on distance. Also include edge information
 
@@ -101,7 +102,9 @@ def extend_to_radius_graph(
     extended_edge_index = torch.stack([connect_indices_1, connect_indices_2], dim=0)
 
     # Edge types for the new connections
-    extended_edge_type = torch.full((number_nodes_1,), specified_type_number, dtype=torch.long, device=device)
+    extended_edge_type = torch.full(
+        (number_nodes_1,), specified_type_number, dtype=torch.long, device=device
+    )
 
     # Combine with existing edges
     combined_edge_index = torch.cat([edge_index, extended_edge_index], dim=1)
@@ -109,17 +112,22 @@ def extend_to_radius_graph(
 
     # Create sparse adjacency matrix for existing and extended edges
     bgraph_adj = torch.sparse_coo_tensor(
-        combined_edge_index, combined_edge_type, torch.Size([total_nodes, total_nodes]), device=device
+        combined_edge_index,
+        combined_edge_type,
+        torch.Size([total_nodes, total_nodes]),
+        device=device,
     )
 
     # Create radius graph for the combined coordinates
-    rgraph_edge_index = radius_graph(combined_coords, r=cutoff, batch=extended_node2graph)
+    rgraph_edge_index = radius_graph_custom(
+        combined_coords, 0.0, cutoff, batch=extended_node2graph
+    )
     rgraph_adj = torch.sparse_coo_tensor(
         rgraph_edge_index,
         torch.ones(rgraph_edge_index.size(1), device=device).long()
         * unspecified_type_number,
         torch.Size([total_nodes, total_nodes]),
-        device=device
+        device=device,
     )
 
     # Combine adjacency matrices
@@ -159,20 +167,20 @@ class E_GCL(nn.Module):
     """
 
     def __init__(
-            self,
-            input_nf,
-            output_nf,
-            hidden_nf,
-            edges_in_d=4,
-            nodes_att_dim=0,
-            act_fn=nn.SiLU(),
-            recurrent=True,
-            attention=False,
-            clamp=False,
-            norm_diff=True,
-            tanh=False,
-            coords_range=1,
-            agg="sum",
+        self,
+        input_nf,
+        output_nf,
+        hidden_nf,
+        edges_in_d=4,
+        nodes_att_dim=0,
+        act_fn=nn.SiLU(),
+        recurrent=True,
+        attention=False,
+        clamp=False,
+        norm_diff=True,
+        tanh=False,
+        coords_range=1,
+        agg="sum",
     ):
         super(E_GCL, self).__init__()
         input_edge = input_nf * 2  # why *2?
@@ -251,7 +259,7 @@ class E_GCL(nn.Module):
         return out, agg
 
     def coord_model(
-            self, coord, edge_index, coord_diff, radial, edge_feat, node_mask, edge_mask
+        self, coord, edge_index, coord_diff, radial, edge_feat, node_mask, edge_mask
     ):
         # print("coord_model", coord_diff, radial, edge_feat)
         row, col = edge_index
@@ -282,14 +290,14 @@ class E_GCL(nn.Module):
         return coord
 
     def forward(
-            self,
-            h,
-            edge_index,
-            coord,
-            edge_type=None,
-            node_attr=None,
-            node_mask=None,
-            edge_mask=None,
+        self,
+        h,
+        edge_index,
+        coord,
+        edge_type=None,
+        node_attr=None,
+        node_mask=None,
+        edge_mask=None,
     ):
         src, dst = edge_index
         radial, coord_diff = self.coord2radial(
@@ -329,21 +337,21 @@ class E_GCL(nn.Module):
 
 class EGNN(nn.Module):
     def __init__(
-            self,
-            in_node_nf,
-            in_edge_nf,
-            # hidden_nf=128,
-            hidden_nf=64,
-            # device="cpu",
-            act_fn=nn.SiLU(),
-            n_layers=5,
-            recurrent=True,
-            attention=True,
-            norm_diff=True,
-            out_node_nf=None,
-            tanh=False,
-            coords_range=15,
-            agg="sum",
+        self,
+        in_node_nf,
+        in_edge_nf,
+        # hidden_nf=128,
+        hidden_nf=64,
+        # device="cpu",
+        act_fn=nn.SiLU(),
+        n_layers=5,
+        recurrent=True,
+        attention=True,
+        norm_diff=True,
+        out_node_nf=None,
+        tanh=False,
+        coords_range=15,
+        agg="sum",
     ):
         """EGNN model
 
@@ -399,20 +407,26 @@ class EGNN(nn.Module):
         # self.to(self.device)
 
     def forward(
-            self,
-            h_initial,
-            original_nodes,
-            perturbed_nodes,
-            edges,
-            node2graph,
-            edge_type=None,
-            node_mask=None,
-            edge_mask=None,
-            extend_radius=True,
+        self,
+        h_initial,
+        original_nodes,
+        perturbed_nodes,
+        edges,
+        node2graph,
+        edge_type=None,
+        node_mask=None,
+        edge_mask=None,
+        extend_radius=True,
     ):
 
-        original_features = torch.cat([h_initial, 7*torch.ones([h_initial.size(0), 1], device=h_initial.device)], dim=1)
-        perturbed_features = torch.cat([h_initial, -7*torch.ones([h_initial.size(0), 1], device=h_initial.device)], dim=1)
+        original_features = torch.cat(
+            [h_initial, torch.zeros([h_initial.size(0), 1], device=h_initial.device)],
+            dim=1,
+        )
+        perturbed_features = torch.cat(
+            [h_initial, torch.ones([h_initial.size(0), 1], device=h_initial.device)],
+            dim=1,
+        )
         h = torch.cat([original_features, perturbed_features], dim=0)
         h = self.embedding(h)
         # print(h)
@@ -438,13 +452,13 @@ class EGNN(nn.Module):
                 node_mask=node_mask,
                 edge_mask=edge_mask,  # what is the purpose of edge_mask?
             )
-            x = torch.cat([original_nodes, x[original_nodes.shape[0]:, :]], dim=0)
+            x = torch.cat([original_nodes, x[original_nodes.shape[0] :, :]], dim=0)
         h = self.embedding_out(h)
 
         # Important, the bias of the last linear might be non-zero
         if node_mask is not None:
             h = h * node_mask
-        return h[original_nodes.shape[0]:, :], x[original_nodes.shape[0]:, :]
+        return h[original_nodes.shape[0] :, :], x[original_nodes.shape[0] :, :]
 
 
 def create_distance_edges_within_graphs(coords, node2graph, cutoff_radius):
@@ -500,10 +514,21 @@ class DynamicsEGNN(nn.Module):
         self.time_embedding = FourierTimeEmbedding(embed_dim=hidden_nf, input_dim=1)
         self.model1 = model(in_node_nf + hidden_nf, in_edge_nf, hidden_nf)
 
-    def forward(self, t, h, original_nodes, perturbed_nodes, edge_index, node2graph, edge_type=None):
+    def forward(
+        self,
+        t,
+        h,
+        original_nodes,
+        perturbed_nodes,
+        edge_index,
+        node2graph,
+        edge_type=None,
+    ):
         t = self.time_embedding(t)
         h = torch.cat([h, t], dim=-1)
-        h, x = self.model1(h, original_nodes, perturbed_nodes, edge_index, node2graph, edge_type)
+        h, x = self.model1(
+            h, original_nodes, perturbed_nodes, edge_index, node2graph, edge_type
+        )
         # print(h.shape)
         # print(x.shape)
         return x, h
@@ -511,6 +536,5 @@ class DynamicsEGNN(nn.Module):
     def reset_parameters(self):
         # Custom logic to reset or initialize parameters
         for module in self.children():
-            if hasattr(module, 'reset_parameters'):
+            if hasattr(module, "reset_parameters"):
                 module.reset_parameters()
-

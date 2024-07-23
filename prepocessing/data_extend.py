@@ -304,7 +304,6 @@ class DataAnalysis:
 class TrajectoriesDataset_Efficient(Dataset):
     def __init__(
         self,
-        cutoff,
         scale=1.0,
         augment=False,
         dataset=[],
@@ -312,7 +311,6 @@ class TrajectoriesDataset_Efficient(Dataset):
         smiles="CC(C(=O)O)N",  # change in future for multi-systems
     ):
         super(TrajectoriesDataset_Efficient, self).__init__()
-        self.cutoff = cutoff
         self.scale = scale
         self.original_h5_file = original_h5_file
         self.augment = augment
@@ -335,66 +333,26 @@ class TrajectoriesDataset_Efficient(Dataset):
         return len(self.indices_traj_frames)
 
     def get(self, idx):
-        # system_idx = 0
-        # frame_idx = 999
         system_idx, frame_idx = self.indices_traj_frames[idx]
-
-        # with h5py.File(self.original_h5_file, 'r') as hf:
-        # Access the group containing the datasets
         group = self.h5_file["h5"]
-
-        # Iterate over the datasets in the group
         coordinates_array_key = "coordinates_array_{}".format(system_idx)
         one_hot_traj_key = "one_hot_traj_{}".format(system_idx)
         atoms_num_key = "atoms_num_{}".format(system_idx)
-
-        # Load coordinates array
         coordinates_array = np.array(group[coordinates_array_key][frame_idx])
-
-        # Load one-hot trajectory array
         one_hot_traj = np.array(group[one_hot_traj_key])
         one_hot_traj = torch.tensor(
             one_hot_traj, dtype=torch.float
         )  # .unsqueeze(0).expand([coordinates_array.shape[0], -1, -1])
 
-        # Load numbers of atoms array
         atoms_num = np.array(group[atoms_num_key])
-
         # Covalent bond
         mol = Chem.MolFromSmiles(self.smiles)
         mol = Chem.AddHs(mol)
         covalent_edge_index, covalent_edge_type = rdmol_to_edge(mol)
-
-        # Create virtual bond based on distance
-        # i, j = radius_graph(coordinates_array,
-        #                     self.cutoff*self.scale,
-        #                     batch=torch.zeros(coordinates_array.shape[0]))
-        # edge_index = torch.stack([i, j])
-        # edge_type = torch.zeros(edge_index.size(-1), dtype=torch.long)
-        # i, j = radius_graph(coordinates_array_plus1,
-        #                     self.cutoff * self.scale,
-        #                     batch=torch.ones(coordinates_array_plus1.shape[0]))
-        # edge_index_plus1 = torch.stack([i, j])
-        # edge_type_plus1 = torch.zeros(edge_index_plus1.size(-1), dtype=torch.long)
-
-        # edge_index, edge_type = extend_to_radius_graph(
-        #     coordinates_array,
-        #     covalent_edge_index,
-        #     covalent_edge_type,
-        #     self.cutoff * self.scale,
-        #     torch.zeros(coordinates_array.shape[0]))
-        # edge_index_plus1, edge_type_plus1 = extend_to_radius_graph(
-        #     coordinates_array_plus1,
-        #     covalent_edge_index,
-        #     covalent_edge_type,
-        #     self.cutoff * self.scale,
-        #     torch.ones(coordinates_array_plus1.shape[0]))
-
         if frame_idx < self.number_frames - 1:
             coordinates_array_plus1 = np.array(
                 group[coordinates_array_key][frame_idx + 1]
             )
-            # coordinates_array_plus1 = torch.tensor(coordinates_array_plus1, dtype=torch.float)
             dd, dx, dy, dz = calculate_displacement_xyz(
                 coordinates_array, coordinates_array_plus1
             )
@@ -409,7 +367,6 @@ class TrajectoriesDataset_Efficient(Dataset):
         coordinates_array = torch.tensor(coordinates_array, dtype=torch.float)
         dd = torch.tensor(dd, dtype=torch.float)
         frame_idx = torch.tensor(frame_idx).repeat([coordinates_array.shape[0], 1])
-
         data = Data(
             pos=coordinates_array,
             x=one_hot_traj,
@@ -423,8 +380,6 @@ class TrajectoriesDataset_Efficient(Dataset):
             dy=dy,
             dz=dz,
         )
-        # data = self.augment_edge(data)
-
         if self.augment:
             return self.random_rotate(data)
         else:
@@ -438,15 +393,9 @@ class TrajectoriesDataset_Efficient(Dataset):
         return data
 
     def augment_edge(self, data):
-        # Extract edge indices i, j from the data
         i, j = data.edge_index
-
-        # Compute edge vectors (edge_vec) and edge lengths (edge_len)
         edge_vec = data.pos[j] - data.pos[i]
         edge_len = edge_vec.norm(dim=-1, keepdim=True)
-
-        # Concatenate edge vectors and edge lengths into edge_encoding
-        # data.edge_encoding = torch.hstack([edge_vec, edge_len])
         data.edge_attr = edge_len
         return data
 
@@ -549,9 +498,7 @@ def generate_loaders(dataset, parameters):
 
 if __name__ == "__main__":
     config = parse_toml_file("config.toml")
-    # directory_path = config['directory_path']
     directory_path = "data/sys"
-    cutoff = config["cutoff"]
     scale = config["scale"]
     node_dim = config["node_dim"]
     edge_dim = config["edge_dim"]
@@ -560,7 +507,7 @@ if __name__ == "__main__":
     num_frames_to_process = config["num_frames_to_process"]
     # DataAnalysis(directory_path, num_frames_to_process, align=True).preprocess_coordinate_onehot()
     TrajsDataset = TrajectoriesDataset_Efficient(
-        cutoff, scale, original_h5_file="data/sys/resname_unl.h5"
+        scale, original_h5_file="data/sys/resname_unl.h5"
     )
     A, B = TrajsDataset.get(0)
     AA, BB = TrajsDataset[0]

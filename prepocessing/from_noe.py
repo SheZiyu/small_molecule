@@ -1,14 +1,10 @@
 """Bring the data from noe into a form that is compatible with our model. To try on the noe data set
 """
 
-import copy
-
-import numpy as np
 import torch
 from rdkit import Chem
 from rdkit.Chem.rdchem import BondType as BT
 from rdkit.Chem.rdchem import HybridizationType, Mol
-from torch_geometric.data import Data
 
 BOND_TYPES = {t: i for i, t in enumerate(BT.names.values())}
 
@@ -53,7 +49,7 @@ def rdmol_to_edge(mol: Mol, include_smiles: bool = False):
     perm = (edge_index[0] * N + edge_index[1]).argsort()
     edge_index = edge_index[:, perm]
     edge_type = edge_type[perm]
-    return edge_index, edge_type 
+    return edge_index, edge_type
 
 
 if __name__ == "__main__":
@@ -63,6 +59,5 @@ if __name__ == "__main__":
     mol = Chem.MolFromSmiles(smiles)
     mol = Chem.AddHs(mol)
     edge_index, edge_type = rdmol_to_edge(mol)
-    
+
     print(edge_index, edge_type)
-    

@@ -371,15 +371,12 @@ class DDPM(nn.Module):
 class LitData(L.LightningDataModule):
     def __init__(self, config):
         super().__init__()
-        self.cutoff = config["cutoff"]
         self.scale = config["scale"]
         self.batch_size = config["batch_size"]
         self.num_workers = config["num_workers"]
 
     def train_dataloader(self):
-        # ProteinAnalysis(directory_path, num_frames_to_process).preprocess_coordinate_onehot()
         TrajsDataset = TrajectoriesDataset_Efficient(
-            cutoff=self.cutoff,
             scale=self.scale,
             original_h5_file="/storage/florian/ziyu_project/resname_unl.h5",
         )
@@ -393,13 +390,12 @@ class LitData(L.LightningDataModule):
 
     def val_dataloader(self):
         # ProteinAnalysis(val_path, num_frames_to_process).preprocess_coordinate_onehot()
-        TrajsDataset_val = TrajectoriesDataset_Efficient(
-            cutoff=self.cutoff,
+        traj_dataset_val = TrajectoriesDataset_Efficient(
             scale=self.scale,
             original_h5_file="/storage/florian/ziyu_project/resname_unl.h5",
         )
         return DataLoader(
-            TrajsDataset_val,
+            traj_dataset_val,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False,
@@ -409,7 +405,6 @@ class LitData(L.LightningDataModule):
     def test_dataloader(self):
         # ProteinAnalysis(test_path, num_frames_to_process).preprocess_coordinate_onehot()
         TrajsDataset_test = TrajectoriesDataset_Efficient(
-            cutoff=self.cutoff,
             scale=self.scale,
             original_h5_file="/storage/florian/ziyu_project/resname_unl.h5",
         )
@@ -471,8 +466,8 @@ class LitModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch):
-        with self.ema.average_parameters():
-            loss = self.forward(batch)
+        #with self.ema.average_parameters():
+        loss = self.forward(batch)
         self.log("val_loss", loss)
         return loss
 
@@ -481,7 +476,7 @@ class LitModel(L.LightningModule):
 
     def optimizer_step(self, *args, **kwargs):
         super().optimizer_step(*args, **kwargs)
-        self.ema.update(self.model.parameters())
+        # self.ema.update(self.model.parameters())
 
 
 if __name__ == "__main__":

@@ -1,17 +1,10 @@
 """Some utility functions """
 
-# env: flow_matching4
-
 from collections.abc import Iterable
-
 import torch
-import yaml
-from easydict import EasyDict
-
-# from torch_sparse import coalesce
 from rdkit.Chem.rdchem import BondType as BT
 from torch_geometric.loader import DataLoader
-from torch_geometric.nn import radius, radius_graph
+from torch_geometric.nn import radius_graph
 from torch_geometric.utils import dense_to_sparse, to_dense_adj
 from torch_scatter import scatter_mean
 from tqdm import tqdm
@@ -195,15 +188,16 @@ def extend_edges_by_higher_order_neighborhood(edge_indices, edge_types):
     unique_edge_indices, unique_edge_types = unique_edges(new_edge_index, new_edge_type)
     return unique_edge_indices, unique_edge_types
 
+
 def extend_to_radius_graph(
-        coords_1,
-        coords_2,
-        edge_index,
-        edge_type,
-        cutoff,
-        node2graph,
-        specified_type_number=3,
-        unspecified_type_number=0,
+    coords_1,
+    coords_2,
+    edge_index,
+    edge_type,
+    cutoff,
+    node2graph,
+    specified_type_number=3,
+    unspecified_type_number=0,
 ):
     """Add further edges based on distance. Also include edge information
 
@@ -244,7 +238,9 @@ def extend_to_radius_graph(
     extended_edge_index = torch.stack([connect_indices_1, connect_indices_2], dim=0)
 
     # Edge types for the new connections
-    extended_edge_type = torch.full((number_nodes_1,), specified_type_number, dtype=torch.long, device=device)
+    extended_edge_type = torch.full(
+        (number_nodes_1,), specified_type_number, dtype=torch.long, device=device
+    )
 
     # Combine with existing edges
     combined_edge_index = torch.cat([edge_index, extended_edge_index], dim=1)
@@ -252,17 +248,22 @@ def extend_to_radius_graph(
 
     # Create sparse adjacency matrix for existing and extended edges
     bgraph_adj = torch.sparse_coo_tensor(
-        combined_edge_index, combined_edge_type, torch.Size([total_nodes, total_nodes]), device=device
+        combined_edge_index,
+        combined_edge_type,
+        torch.Size([total_nodes, total_nodes]),
+        device=device,
     )
 
     # Create radius graph for the combined coordinates
-    rgraph_edge_index = radius_graph(combined_coords, r=cutoff, batch=extended_node2graph)
+    rgraph_edge_index = radius_graph(
+        combined_coords, r=cutoff, batch=extended_node2graph
+    )
     rgraph_adj = torch.sparse_coo_tensor(
         rgraph_edge_index,
         torch.ones(rgraph_edge_index.size(1), device=device).long()
         * unspecified_type_number,
         torch.Size([total_nodes, total_nodes]),
-        device=device
+        device=device,
     )
 
     # Combine adjacency matrices
@@ -272,46 +273,6 @@ def extend_to_radius_graph(
 
     return new_edge_index, new_edge_type
 
-# def extend_to_radius_graph(
-#     coords,
-#     edge_index,
-#     edge_type,
-#     cutoff,
-#     node2graph,
-#     unspecified_type_number=0,
-# ):
-#     """Add further edges based on distance. Also include edge information
-
-#     Args:
-#         coords: coordinates of the atoms
-#         edge_index: source and destination of the edges
-#         edge_type: type of the edges
-#         cutoff: an edge will be set, if the distance between the atoms is smaller than the cutoff
-#         node2graph: specifies which of the batched nodes belong to which graph
-#         unspecified_type_number: This is the edge type that is assigned to the edges constructed from radius. Defaults to 0.
-
-#     Returns:
-#         new_edge_index: the updated edge sourse/destination tensor
-#         new_edge_type: the type of the edges
-#     """
-#     assert edge_type.dim() == 1
-#     number_nodes = coords.size(0)
-#     bgraph_adj = torch.sparse_coo_tensor(
-#         edge_index, edge_type, torch.Size([number_nodes, number_nodes])
-#     )
-#     rgraph_edge_index = radius_graph(coords, r=cutoff, batch=node2graph)  # (2, E_r)
-#     # radius_graph(coords.to(5), r=cutoff, batch=node2graph.to(5))
-
-#     rgraph_adj = torch.sparse_coo_tensor(
-#         rgraph_edge_index,
-#         torch.ones(rgraph_edge_index.size(1)).long().to(coords.device)
-#         * unspecified_type_number,
-#         torch.Size([number_nodes, number_nodes]),
-#     )
-#     composed_adj = (bgraph_adj + rgraph_adj).coalesce()  # Sparse (N, N, T)
-#     new_edge_index = composed_adj.indices()
-#     new_edge_type = composed_adj.values().long()
-#     return new_edge_index, new_edge_type
 
 def extend_to_fully_connected_graph(
     coords,
@@ -335,12 +296,12 @@ def extend_to_fully_connected_graph(
     """
     assert edge_type.dim() == 1
     number_nodes = coords.size(0)
-    
+
     # Create adjacency matrix for existing edges
     bgraph_adj = torch.sparse_coo_tensor(
         edge_index, edge_type, torch.Size([number_nodes, number_nodes])
     )
-    
+
     # Create fully connected graph edge indices within each individual graph
     full_edge_index_list = []
     unique_graphs = node2graph.unique()
@@ -350,60 +311,21 @@ def extend_to_fully_connected_graph(
         # Duplicate edges to include both directions
         full_edge_index = torch.cat([full_edge_index, full_edge_index.flip(0)], dim=1)
         full_edge_index_list.append(full_edge_index)
-    
+
     full_edge_index = torch.cat(full_edge_index_list, dim=1)
-    
+
     # Create adjacency matrix for fully connected graph with unspecified edge type
     full_adj = torch.sparse_coo_tensor(
         full_edge_index,
-        torch.ones(full_edge_index.size(1)).long().to(coords.device) * unspecified_type_number,
-        torch.Size([number_nodes, number_nodes])
+        torch.ones(full_edge_index.size(1)).long().to(coords.device)
+        * unspecified_type_number,
+        torch.Size([number_nodes, number_nodes]),
     )
-    
+
     # Combine existing edges with fully connected graph edges
     composed_adj = (bgraph_adj + full_adj).coalesce()  # Sparse (N, N, T)
-    
+
     # Extract new edge indices and types
     new_edge_index = composed_adj.indices()
     new_edge_type = composed_adj.values().long()
-    
     return new_edge_index, new_edge_type
-
-if __name__ == "__main__":
-    config_path = "configs/nmrshift.yml"
-    # config_path = "configs/ala2.yml"
-    with open(config_path, "r") as f:
-        config = EasyDict(yaml.safe_load(f))
-    # transforms = CountNodesPerGraph()
-    device = 6
-    # max_number_samples = 1
-    # max_number_samples = 560
-    # max_number_samples = 565
-    # max_number_samples = -1
-    max_index = -1
-    # min_index = 2000
-    min_index = 0
-    val_set = ConformationDataset(config.dataset.val, max_index, min_index)
-    ## batch_size = 1000
-    batch_size = 450
-    train_loader = DataLoader(val_set, batch_size, shuffle=True)
-    for batch in train_loader:
-        batch = batch.to(device)
-        coords = batch.pos
-        node2graph = batch.batch
-        cutoff_radius = 10.0
-        edge_types = batch.edge_type
-        edge_indices = batch.edge_index
-        # edge_indices, edge_types = extend_edges_by_higher_order_neighborhood(
-        #    edge_indices, edge_types
-        # )
-        cutoff = 10.0
-        new_edge_index, new_edge_type = extend_to_radius_graph(
-            coords,
-            edge_indices,
-            edge_types,
-            cutoff,
-            batch.batch,
-            unspecified_type_number=0,
-        )
-        print("hello")
