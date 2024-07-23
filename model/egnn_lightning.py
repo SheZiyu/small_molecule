@@ -12,6 +12,7 @@ from torch.optim import lr_scheduler
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data_extend import TrajectoriesDataset_Efficient
 from model.egnn_flow_matching import DynamicsEGNN
+from utils.auxiliary import get_optimizer
 
 
 class DDPM(nn.Module):
@@ -198,7 +199,7 @@ class DDPM(nn.Module):
         order3,
         M=30,
         return_all=False,
-        **kwargs
+        **kwargs,
     ):
         """
         Performs the reverse denoising process, reconstructing the data from its noised state.
@@ -436,8 +437,10 @@ class LitModel(L.LightningModule):
 
         self.criterion = nn.MSELoss()
         self.save_hyperparameters()
+        self.train_outputs = []
+        self.valid_outputs = []
 
-    def forward(self, batch):
+    def forward(self, batch, outputs=None):
         with torch.no_grad():
             unique_graph_indices = torch.unique(batch.batch)
             num_unique_graphs = len(unique_graph_indices)
@@ -457,22 +460,72 @@ class LitModel(L.LightningModule):
             edge_type=batch.edge_type,
         )
         loss = self.criterion(pred_perturbed_nodes - batch.pos, batch.dd - noised_dd)
+        outputs.append(
+            {
+                "loss": loss,
+            }
+        )
+        print("loss_total: ", loss)
         return loss
 
+    @staticmethod
+    def epoch_end_metrics(outputs, label: str, stride: int = 1):
+        """Compute all metrics at the end of an epoch"""
+        losses = [output["loss"] for output in outputs[::stride]]
+        metrics = {
+            f"{label}_loss": torch.tensor(losses).mean().item(),
+        }
+        return metrics
+
     def training_step(self, batch):
-        loss = self.forward(batch)
-        self.log("train_loss", loss)
-        self.log("learning_rate", self.optimizer.param_groups[0]["lr"])
+        loss = self.forward(batch, self.train_outputs)
+        # self.log("train_loss", loss)
+        # self.log("learning_rate", self.optimizer.param_groups[0]["lr"])
         return loss
+
+    def on_train_epoch_end(self):
+        """Training epoch end (logging)"""
+        metrics = self.epoch_end_metrics(self.train_outputs, "train", stride=1)
+        self.log_dict(
+            metrics,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        self.train_outputs = []
 
     def validation_step(self, batch):
         # with self.ema.average_parameters():
-        loss = self.forward(batch)
-        self.log("val_loss", loss)
+        loss = self.forward(batch, self.valid_outputs)
+        # self.log("val_loss", loss)
         return loss
+
+    def on_validation_epoch_end(self):
+        """Validation epoch end (logging)"""
+        metrics = self.epoch_end_metrics(self.valid_outputs, "valid", stride=1)
+        self.log_dict(
+            metrics,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        self.valid_outputs = []
 
     def configure_optimizers(self):
         return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
+
+    def load_checkpoint(self, checkpoint_path):
+        assert os.path.exists(
+            checkpoint_path
+        ), f"resume_path ({checkpoint_path}) does not exist"
+        self.load_state_dict(
+            torch.load(checkpoint_path, map_location="cpu")["state_dict"]
+        )
+        print(f"Loaded checkpoint from {checkpoint_path}")
 
     def optimizer_step(self, *args, **kwargs):
         super().optimizer_step(*args, **kwargs)

@@ -1,0 +1,27 @@
+name: diffusion_egnn
+pin_memory: true
+num_workers: 1
+batch_size: 12
+train_size: 0.7
+num_epochs: 5000
+num_splits: 3  # Number of cross-validation splits
+num_frames_to_process: 10000
+learning_rate: 0.001
+decay: 0.995
+patience: 1000
+cuda_ids: [0]
+acc_grad_batches: 1
+node_dim: 18
+vector_dim: 3
+#edge_type_dim: 4
+edge_dim: 1
+cutoff: 2
+scale: 7
+#scale_var: 2
+#num_bins: 20
+#directory_path: 'data/sys'
+data_dir: 'data/sys'
+resume_path:
+load_checkpoint: False
+repository_location: /home/florian/Repos/small_molecule
+do_validation: true  # Flag to control validation
