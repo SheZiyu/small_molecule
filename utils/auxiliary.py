@@ -1,9 +1,8 @@
 import os
 import zipfile
-
 import numpy as np
-
 import torch
+from torch_scatter import scatter_add, scatter_mean
 
 
 def construct_edges(A, n_node):
@@ -175,21 +174,40 @@ def write_combined_pdb(original_pdb, new_coordinates, output_file):
 
     print(f"Finished writing PDB file: {output_file}")
 
+
 def set_seed(seed=42):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # if you are using CUDA
 
-def get_optimizer(model, name='adam', **kwargs):
+
+def get_optimizer(model, name="adam", **kwargs):
     """Get optimizer by name and parameters from model"""
     parameters = filter(lambda p: p.requires_grad, model.parameters())
     name = name.lower()
     if name == "adam":
         return torch.optim.Adam(parameters, **kwargs)
-    elif name == 'sgd':
+    elif name == "sgd":
         return torch.optim.SGD(parameters, **kwargs)
-    elif name == 'adadelta':
+    elif name == "adadelta":
         return torch.optim.Adadelta(parameters, **kwargs)
-    elif name == 'adagrad':
+    elif name == "adagrad":
         return torch.optim.Adagrad(parameters, **kwargs)
     else:
-        raise NotImplementedError('Optimizer not supported: %s' % name)
+        raise NotImplementedError("Optimizer not supported: %s" % name)
+
+
+def subtract_means(stacked_points, node2graph):
+    """Center the stacked_points by subtracting the corresponding means. node2graph specifies wich points belong to the same graph.
+
+    Args:
+        stacked_points: tensor of atom points
+        node2graph: tensor of indices specifying to which graph a node belongs
+
+    Returns:
+        centered_points: centered points
+    """
+    means = scatter_mean(
+        stacked_points, node2graph, dim=0, dim_size=node2graph.max() + 1
+    )
+    centered_points = stacked_points - means.index_select(0, node2graph)
+    return centered_points

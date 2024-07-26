@@ -491,22 +491,6 @@ def create_distance_edges_within_graphs(coords, node2graph, cutoff_radius):
     return edge_indices
 
 
-def subtract_means(stacked_points, node2graph):
-    """Center the stacked_points by subtracting the corresponding means. node2graph specifies wich points belong to the same graph.
-
-    Args:
-        stacked_points: tensor of atom points
-        node2graph: tensor of indices specifying to which graph a node belongs
-
-    Returns:
-        centered_points: centered points
-    """
-    means = scatter_mean(
-        stacked_points, node2graph, dim=0, dim_size=node2graph.max() + 1
-    )
-    centered_points = stacked_points - means.index_select(0, node2graph)
-    return centered_points
-
 
 class DynamicsEGNN(nn.Module):
     def __init__(self, in_node_nf, in_edge_nf, hidden_nf=64, model=EGNN):
