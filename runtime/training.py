@@ -1,4 +1,5 @@
 """Training the model
+env: ziyu2
 """
 
 import resource
@@ -12,6 +13,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from model.egnn_lightning import LitModel, LitData
 import os
 from utils.auxiliary import set_seed
+from lightning.pytorch.strategies import DDPStrategy
 
 
 class InitialCheckpoint(Callback):
@@ -62,6 +64,7 @@ def main(config):
         precision=16,
         accumulate_grad_batches=config.acc_grad_batches,
         callbacks=callbacks,
+        strategy=DDPStrategy(find_unused_parameters=True),
     )
 
     # Train neural network

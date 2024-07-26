@@ -1,6 +1,6 @@
 name: diffusion_egnn
 pin_memory: true
-num_workers: 1
+num_workers: 5
 batch_size: 200
 train_size: 0.7
 num_epochs: 5000
@@ -9,14 +9,15 @@ num_frames_to_process: 10000
 learning_rate: 0.001
 decay: 0.995
 patience: 1000
-cuda_ids: [0]
+cuda_ids: [0,1,2,3,4,5]
 acc_grad_batches: 1
 node_dim: 18
 vector_dim: 3
 #edge_type_dim: 4
 edge_dim: 1
 cutoff: 2
-scale: 7
+scale: 1
+sigma: 0.01 #for flow matching
 #scale_var: 2
 #num_bins: 20
 #directory_path: 'data/sys'

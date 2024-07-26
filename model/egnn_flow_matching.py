@@ -385,7 +385,6 @@ class EGNN(nn.Module):
         ### Encoder
         # self.add_module("gcl_0", E_GCL(in_node_nf, self.hidden_nf, self.hidden_nf, edges_in_d=in_edge_nf, act_fn=act_fn, recurrent=False, coords_weight=coords_weight))
         self.embedding = nn.Linear(in_node_nf, self.hidden_nf)
-        self.embedding_out = nn.Linear(self.hidden_nf, out_node_nf)
         for i in range(0, n_layers):
             self.add_module(
                 "gcl_%d" % i,
@@ -426,8 +425,8 @@ class EGNN(nn.Module):
             [h_initial, torch.ones([h_initial.size(0), 1], device=h_initial.device)],
             dim=1,
         )
-        h = torch.cat([original_features, perturbed_features], dim=0)
-        h = self.embedding(h)
+        h_initial_composed = torch.cat([original_features, perturbed_features], dim=0)
+        h = self.embedding(h_initial_composed)
         new_edge_index, new_edge_type = extend_to_radius_graph(
             original_nodes,
             perturbed_nodes,
@@ -450,15 +449,10 @@ class EGNN(nn.Module):
             node_coordinates = torch.cat(
                 [original_nodes, node_coordinates[original_nodes.shape[0] :]], dim=0
             )
-        h = self.embedding_out(h)
-
         # Important, the bias of the last linear might be non-zero
         if node_mask is not None:
             h = h * node_mask
-        return (
-            h[original_nodes.shape[0] :, :],
-            node_coordinates[original_nodes.shape[0] :, :],
-        )
+        return node_coordinates[original_nodes.shape[0] :, :]
 
 
 def create_distance_edges_within_graphs(coords, node2graph, cutoff_radius):
@@ -491,7 +485,6 @@ def create_distance_edges_within_graphs(coords, node2graph, cutoff_radius):
     return edge_indices
 
 
-
 class DynamicsEGNN(nn.Module):
     def __init__(self, in_node_nf, in_edge_nf, hidden_nf=64, model=EGNN):
         super(DynamicsEGNN, self).__init__()
@@ -509,9 +502,14 @@ class DynamicsEGNN(nn.Module):
         edge_type=None,
     ):
         t = self.time_embedding(t)
-        h = torch.cat([h, t], dim=-1)
-        h, perturbed_nodes_updated = self.model1(
-            h, original_nodes, perturbed_nodes, edge_index, node2graph, edge_type
+        h_composed = torch.cat([h, t], dim=-1)
+        perturbed_nodes_updated = self.model1(
+            h_composed,
+            original_nodes,
+            perturbed_nodes,
+            edge_index,
+            node2graph,
+            edge_type,
         )
         return perturbed_nodes_updated
 
