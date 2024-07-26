@@ -1,7 +1,6 @@
 from torch_geometric.loader import DataLoader
 import lightning as L
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
-from torch_ema import ExponentialMovingAverage
 
 import os
 import torch
@@ -11,7 +10,7 @@ from torch.optim import lr_scheduler
 
 from prepocessing.preprocessing import parse_toml_file
 from prepocessing.data_extend import TrajectoriesDataset_Efficient
-from model.egnn_flow_matching import DynamicsEGNN
+from model.egnn import DynamicsEGNN
 from utils.auxiliary import get_optimizer, subtract_means
 
 

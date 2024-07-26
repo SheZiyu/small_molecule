@@ -2,7 +2,7 @@ import os
 import zipfile
 import numpy as np
 import torch
-from torch_scatter import scatter_add, scatter_mean
+from torch_scatter import scatter_mean
 
 
 def construct_edges(A, n_node):
