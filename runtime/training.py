@@ -42,6 +42,15 @@ def main(config):
     )
 
     datamodule = LitData(config)
+    # for batch in datamodule.train_dataloader():
+    #    diff1=batch.pos[batch.batch==1]-batch.pos[batch.batch==0]
+    #    diff2=batch.dd[batch.batch==0]
+    #    print(batch)
+
+    # data_iterator = iter(datamodule.train_dataloader())
+    # first_batch = next(data_iterator)
+    # first_batch.pos[first_batch.batch==0]
+
     model = LitModel(config)
     # If resuming, load checkpoint
     if config.resume_path is not None and config.load_checkpoint is True:
@@ -66,6 +75,7 @@ def main(config):
         precision=16,
         accumulate_grad_batches=config.acc_grad_batches,
         callbacks=callbacks,
+        # strategy="auto",
         strategy=DDPStrategy(find_unused_parameters=True),
     )
 

@@ -17,6 +17,8 @@ from utils.auxiliary import subtract_means
 import hydra
 from model.egnn_lightning import LitModel, LitData
 
+# def generate_trajectory_original_data()
+
 
 @hydra.main(config_path="../config/", config_name="diffusion_egnn", version_base="1.1")
 def main(config):
@@ -32,17 +34,17 @@ def main(config):
     ###########################################################################################
     number_nodes_batch = first_batch.batch.shape[0]
     t_max = 1.0
-    t_max = 1.0
-    n_time_steps = 20
+    n_time_steps = 5
     ts = torch.linspace(0.0, t_max, n_time_steps).to(device)
     rtol = 1e-7
     atol = 1e-9
     method = "euler"
     trajectory = []
-    traj_len = 200
+    traj_len = 10000
     bb_dynamics = BlackBoxDynamics(model, config)
+    start_time = time.time()
     for ind in tqdm(range(traj_len), desc="Generating Trajectory"):
-        trajectory.append(first_batch.pos)
+        trajectory.append(subtract_means(first_batch.pos, first_batch.batch))
         bb_dynamics.forward = partial(bb_dynamics.forward, batch=first_batch)
         noise = torch.randn(number_nodes_batch, 3).to(device)
         noise_mean_free = subtract_means(noise, first_batch.batch)
@@ -56,11 +58,15 @@ def main(config):
                 atol=atol,
                 method=method,
             )
-            first_batch.pos = first_batch.pos + solution[-1]
+            first_batch.pos = subtract_means(
+                first_batch.pos + solution[-1], first_batch.batch
+            )
             # state = state
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"Execution time: {execution_time} seconds")
     trajectory_np = np.array(trajectory)
-    np.save("results/trajectory.npy", trajectory_np)
-    print("here")
+    np.save("/home/florian/Repos/small_molecule/results/trajectory.npy", trajectory_np)
 
 
 if __name__ == "__main__":

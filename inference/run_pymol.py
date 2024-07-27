@@ -5,33 +5,35 @@
 # pymol.finish_launching()
 
 # Load the topology file (PDB)
-pdb_path = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A/gt_1a10A.pdb'
-cmd.load(pdb_path, 'gt_1a10A')
+pdb_path = (
+    "/home/florian/Repos/small_molecule/data/alanine_final_structure_no_water.pdb"
+)
+cmd.load(pdb_path, "alanine")
 
 # Load the trajectory file (XTC) into the existing topology
-xtc_path = '/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A/output_trajectory.xtc'
-cmd.load_traj(xtc_path, 'gt_1a10A')
+xtc_path = "/home/florian/Repos/small_molecule/results/output_trajectory.xtc"
+cmd.load_traj(xtc_path, "alanine")
 
 # Center the view on the molecule
-cmd.center("gt_1a10A", animate=-1)
+cmd.center("alanine", animate=-1)
 
 # Perform intra_fit to align all states of the object to the first state
-cmd.intra_fit("gt_1a10A")
+cmd.intra_fit("alanine")
 
 # Align all states to the first state using the RMS command for all atoms
-cmd.rms("gt_1a10A", "gt_1a10A and state 1")
+cmd.rms("alanine", "alanine and state 1")
 
 # Center the view again
-cmd.center('all')
+cmd.center("all")
 
 # Zoom to fit the molecule in the view
-cmd.zoom('all')
+cmd.zoom("all")
 
 # Optional: Show the structure as cartoon representation
-cmd.show('cartoon', 'gt_1a10A')
+cmd.show("cartoon", "alanine")
 
 # Optional: Set the background color to white
 # cmd.bg_color('white')
 
 # Save the session if needed
-cmd.save('/home/ziyu/repos/small_molecule/output_images_gnn_solver1/1a10A/aligned_trajectory.pse')
+cmd.save("/home/florian/Repos/small_molecule/results/aligned_trajectory.pse")

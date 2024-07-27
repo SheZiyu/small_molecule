@@ -26,6 +26,8 @@ class LitData(L.LightningDataModule):
             scale=self.scale,
             original_h5_file="/storage/florian/ziyu_project/resname_unl.h5",
         )
+        # ind=10
+        # (TrajsDataset[ind+1].pos- TrajsDataset[ind].pos)- TrajsDataset[ind].dd
         return DataLoader(
             TrajsDataset,
             batch_size=self.batch_size,
@@ -75,7 +77,7 @@ class LitModel(L.LightningModule):
         # self.dpm = DDPM()
         self.optimizer = optim.Adam(self.model.parameters(), lr=config["learning_rate"])
         self.scheduler = lr_scheduler.StepLR(
-            self.optimizer, step_size=100, gamma=0.1
+            self.optimizer, step_size=300, gamma=0.1
         )  # Configure scheduler here
         # self.ema = ExponentialMovingAverage(
         #    self.model.parameters(), decay=config["decay"]
@@ -90,9 +92,15 @@ class LitModel(L.LightningModule):
         with torch.no_grad():
             device = batch.x.device
             number_nodes_batch = batch.batch.shape[0]
+            position_noise = 0.1 * torch.randn_like(batch.pos)
+            current_positions_noised = subtract_means(
+                batch.pos + position_noise, batch.batch
+            )
             p0_samples = torch.randn(number_nodes_batch, 3).to(device)
             p0_samples_mean_free = subtract_means(p0_samples, batch.batch)
-            p1_samples_mean_free = subtract_means(batch.dd, batch.batch)
+            p1_samples_mean_free = subtract_means(
+                batch.dd - position_noise, batch.batch
+            )
             time = torch.rand(len(batch), 1).to(device)
             num_nodes_per_graph = torch.bincount(batch.batch)
             time_repeated = time.repeat_interleave(num_nodes_per_graph, dim=0)
@@ -104,12 +112,14 @@ class LitModel(L.LightningModule):
             noise = torch.randn(number_nodes_batch, 3).to(device)
             noise_mean_free = subtract_means(noise, batch.batch)
             dx_mean_free = mu_t + sigma_t * noise_mean_free
-            perturbed_nodes = batch.pos + dx_mean_free
+            perturbed_nodes = subtract_means(
+                current_positions_noised + dx_mean_free, batch.batch
+            )
             target_vectors = p1_samples_mean_free - p0_samples_mean_free
         perturbed_nodes_updated = self.model(
             t=time_repeated,
             h=batch.x,
-            original_nodes=batch.pos,
+            original_nodes=current_positions_noised,
             perturbed_nodes=perturbed_nodes,
             edge_index=batch.edge_index,
             node2graph=batch.batch,
@@ -126,6 +136,8 @@ class LitModel(L.LightningModule):
         )
         print("loss_total: ", loss)
         return loss
+        # diff1 = batch.pos[batch.batch == 1] - batch.pos[batch.batch == 0]
+        # diff2 = batch.dd[batch.batch == 0]
 
     @staticmethod
     def epoch_end_metrics(outputs, label: str, stride: int = 1):
@@ -140,6 +152,9 @@ class LitModel(L.LightningModule):
         loss = self.forward(batch, self.train_outputs)
         # self.log("train_loss", loss)
         # self.log("learning_rate", self.optimizer.param_groups[0]["lr"])
+        # diff1=batch.pos[batch.batch==1]-batch.pos[batch.batch==0]
+        # diff2=batch.dd[batch.batch==0]
+        # diff1-diff2
         return loss
 
     def on_train_epoch_end(self):

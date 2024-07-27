@@ -3,13 +3,15 @@ pin_memory: true
 num_workers: 5
 batch_size: 1
 train_size: 0.7
-num_epochs: 5000
+num_epochs: 20000
 num_splits: 3  # Number of cross-validation splits
 num_frames_to_process: 10000
-learning_rate: 0.001
+learning_rate: 0.005
 decay: 0.995
 patience: 1000
-cuda_ids: [0]
+#cuda_ids: [0,1,2,3,4,5,6]
+#cuda_ids: [0,1,2,3,4]
+cuda_ids: [7]
 acc_grad_batches: 1
 node_dim: 18
 vector_dim: 3
@@ -17,7 +19,7 @@ vector_dim: 3
 edge_dim: 1
 cutoff: 2
 scale: 1
-sigma: 0.01 #for flow matching
+sigma: 0.02 #for flow matching
 #scale_var: 2
 #num_bins: 20
 #directory_path: 'data/sys'
@@ -25,4 +27,5 @@ data_dir: 'data/sys'
 load_checkpoint: False
 repository_location: /home/florian/Repos/small_molecule
 do_validation: false  # Flag to control validation
-resume_path: /home/florian/Repos/small_molecule/outputs/2024-07-26/13-31-35/outputs/epoch=429-step=3870.ckpt
+#resume_path: /home/florian/Repos/small_molecule/outputs/2024-07-26/13-31-35/outputs/epoch=429-step=3870.ckpt
+resume_path: /home/florian/Repos/small_molecule/outputs/2024-07-27/12-26-54/outputs/last.ckpt
