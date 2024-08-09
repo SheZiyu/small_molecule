@@ -9,6 +9,9 @@ import torch
 from torch_geometric.data import Data
 from prepocessing.from_noe import rdmol_to_edge
 from rdkit import Chem
+from omegaconf import DictConfig
+from torch_geometric.loader import DataLoader as PGDataLoader
+from omegaconf import OmegaConf
 
 
 class LitData(L.LightningDataModule):
@@ -63,8 +66,12 @@ class LitData(L.LightningDataModule):
 
 
 class TrajectoryData(Dataset):
-    def __init__(self, pdb_path, trajectory_path, increments_path, selected_indices):
+    def __init__(
+        self, pdb_path, trajectory_path, increments_path, selected_indices=None
+    ):
         super().__init__()
+        if selected_indices is None:
+            selected_indices = torch.arange(len(torch.load(trajectory_path)))
         self.trajectory_data = torch.load(trajectory_path)[selected_indices]
         self.increment_data = torch.load(increments_path)[selected_indices]
         mol = Chem.MolFromPDBFile(pdb_path)
@@ -83,6 +90,23 @@ class TrajectoryData(Dataset):
         return len(self.trajectory_data)
 
 
+def create_dataloaders(config: DictConfig):
+    training_set = TrajectoryData(
+        config.data.pdb_path,
+        config.data.trajectory_path,
+        config.data.increments_path,
+    )
+    train_loader_kwargs = {
+        "batch_size": config.train.batch_size,
+        "num_workers": config.train.num_workers,
+        "pin_memory": config.train.pin_memory,
+    }
+    train_dataloader = PGDataLoader(
+        dataset=training_set, shuffle=True, **train_loader_kwargs
+    )
+    return train_dataloader
+
+
 if __name__ == "__main__":
     pdb_path = "/storage/florian/ziyu_project/ala2/ala2.pdb"
     trajectory_path = (
@@ -95,4 +119,9 @@ if __name__ == "__main__":
     data_set = TrajectoryData(
         pdb_path, trajectory_path, increments_path, selected_indices
     )
+    # read yaml file:
+    config = OmegaConf.load(
+        "/home/florian/Repos/small_molecule/config/diffusion_egnn2.yaml"
+    )
+    train_dataloader = create_dataloaders(config)
     print("done")
