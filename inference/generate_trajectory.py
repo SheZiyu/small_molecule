@@ -40,7 +40,7 @@ def main(config):
     atol = 1e-9
     method = "euler"
     trajectory = []
-    traj_len = 10000
+    traj_len = 5000
     bb_dynamics = BlackBoxDynamics(model, config)
     start_time = time.time()
     for ind in tqdm(range(traj_len), desc="Generating Trajectory"):

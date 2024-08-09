@@ -61,9 +61,12 @@ def create_trajectory_file(numpy_file_path, pdb_file_path, output_dir):
 
 
 if __name__ == "__main__":
-    numpy_file_path = "/home/florian/Repos/small_molecule/results/trajectory.npy"
-    pdb_file_path = (
-        "/home/florian/Repos/small_molecule/data/alanine_final_structure_no_water.pdb"
-    )
-    output_dir = "/home/florian/Repos/small_molecule/results/"
+    # numpy_file_path = "/home/florian/Repos/small_molecule/results/trajectory.npy"
+    # pdb_file_path = (
+    #    "/home/florian/Repos/small_molecule/data/alanine_final_structure_no_water.pdb"
+    # )
+    # output_dir = "/home/florian/Repos/small_molecule/results/ala"
+    numpy_file_path = "/home/florian/Repos/small_molecule/data/ala2/trajectory.npy"
+    pdb_file_path = "/home/florian/Repos/small_molecule/data/ala2/ala2.pdb"
+    output_dir = "/home/florian/Repos/small_molecule/results/ala2"
     create_trajectory_file(numpy_file_path, pdb_file_path, output_dir)

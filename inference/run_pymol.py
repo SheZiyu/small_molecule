@@ -5,13 +5,16 @@
 # pymol.finish_launching()
 
 # Load the topology file (PDB)
-pdb_path = (
-    "/home/florian/Repos/small_molecule/data/alanine_final_structure_no_water.pdb"
-)
+# pdb_path = (
+#    "/home/florian/Repos/small_molecule/data/alanine_final_structure_no_water.pdb"
+# )
+
+pdb_path = "/home/florian/Repos/small_molecule/results/ala2/output_trajectory.pdb"
 cmd.load(pdb_path, "alanine")
 
 # Load the trajectory file (XTC) into the existing topology
-xtc_path = "/home/florian/Repos/small_molecule/results/output_trajectory.xtc"
+# xtc_path = "/home/florian/Repos/small_molecule/results/output_trajectory.xtc"
+xtc_path = "/home/florian/Repos/small_molecule/results/ala2/output_trajectory.xtc"
 cmd.load_traj(xtc_path, "alanine")
 
 # Center the view on the molecule
@@ -34,6 +37,13 @@ cmd.show("cartoon", "alanine")
 
 # Optional: Set the background color to white
 # cmd.bg_color('white')
+cmd.set("stick_radius", 1.0, "alanine")
 
 # Save the session if needed
-cmd.save("/home/florian/Repos/small_molecule/results/aligned_trajectory.pse")
+# cmd.save("/home/florian/Repos/small_molecule/results/aligned_trajectory.pse")
+# cmd.save("/home/florian/Repos/small_molecule/results/ala2_original.pse")
+output_pdb_path = (
+    "/home/florian/Repos/small_molecule/results/ala2/output_trajectory_with_frames.pdb"
+)
+cmd.save(output_pdb_path, "alanine", state=0)
+print("saved trajectory")

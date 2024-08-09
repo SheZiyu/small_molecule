@@ -14,55 +14,6 @@ from model.egnn import DynamicsEGNN
 from utils.auxiliary import get_optimizer, subtract_means
 
 
-class LitData(L.LightningDataModule):
-    def __init__(self, config):
-        super().__init__()
-        self.scale = config["scale"]
-        self.batch_size = config["batch_size"]
-        self.num_workers = config["num_workers"]
-
-    def train_dataloader(self):
-        TrajsDataset = TrajectoriesDataset_Efficient(
-            scale=self.scale,
-            original_h5_file="/storage/florian/ziyu_project/resname_unl.h5",
-        )
-        # ind=10
-        # (TrajsDataset[ind+1].pos- TrajsDataset[ind].pos)- TrajsDataset[ind].dd
-        return DataLoader(
-            TrajsDataset,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            shuffle=True,
-            pin_memory=True,
-        )
-
-    def val_dataloader(self):
-        # ProteinAnalysis(val_path, num_frames_to_process).preprocess_coordinate_onehot()
-        traj_dataset_val = TrajectoriesDataset_Efficient(
-            scale=self.scale,
-            original_h5_file="/storage/florian/ziyu_project/resname_unl.h5",
-        )
-        return DataLoader(
-            traj_dataset_val,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            shuffle=False,
-            pin_memory=True,
-        )
-
-    def test_dataloader(self):
-        # ProteinAnalysis(test_path, num_frames_to_process).preprocess_coordinate_onehot()
-        TrajsDataset_test = TrajectoriesDataset_Efficient(
-            scale=self.scale,
-            original_h5_file="/storage/florian/ziyu_project/resname_unl.h5",
-        )
-        return DataLoader(
-            TrajsDataset_test,
-            batch_size=1,
-            num_workers=self.num_workers,
-            shuffle=False,
-            pin_memory=True,
-        )
 
 
 # define the LightningModule
