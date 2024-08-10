@@ -1,18 +1,18 @@
 name: diffusion_egnn
 train:
   pin_memory: true
-  num_workers: 5
+  num_workers: 10
   batch_size: 500
   train_size: 0.7
   num_epochs: 20000
   num_splits: 3  # Number of cross-validation splits
   num_frames_to_process: 10000
-  learning_rate: 0.005
+  learning_rate: 0.001
   decay: 0.995
   patience: 1000
-  #cuda_ids: [0,1,2,3,4,5,6]
+  cuda_ids: [0,1,2,3,4]
   #cuda_ids: [0,1,2,3,4]
-  cuda_ids: [5,6]
+  #cuda_ids: [0,1,]
   acc_grad_batches: 1
   node_dim: 18
   #edge_type_dim: 4
@@ -24,11 +24,11 @@ train:
   #num_bins: 20
   #directory_path: 'data/sys'
   #data_dir: 'data/sys'
-  load_checkpoint: False
+  load_checkpoint: True
   repository_location: /home/florian/Repos/small_molecule
   do_validation: false  # Flag to control validation
   #resume_path: /home/florian/Repos/small_molecule/outputs/2024-07-26/13-31-35/outputs/epoch=429-step=3870.ckpt
-  resume_path: /home/florian/Repos/small_molecule/outputs/2024-07-27/12-26-54/outputs/last.ckpt
+  resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/14-48-44/outputs/epoch=9-step=10000.ckpt
 data:
   pdb_path: "/storage/florian/ziyu_project/ala2/ala2.pdb"
   trajectory_path: "/storage/florian/ziyu_project/ala2/merged_data/trajectory_merged_tensor.pt"

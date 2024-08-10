@@ -83,32 +83,33 @@ class LitModel(L.LightningModule):
             perturbed_nodes_updated - perturbed_nodes, batch.batch
         )
         loss = torch.mean((target_vectors - predicted_vectors) ** 2)
-        outputs.append(
-            {
-                "loss": loss,
-            }
-        )
+        if loss is not None:
+            outputs.append({"loss": loss})
+        else:
+            print("Loss is None, skipping append.")
         print("loss_total: ", loss)
         return loss
-        # diff1 = batch.pos[batch.batch == 1] - batch.pos[batch.batch == 0]
-        # diff2 = batch.dd[batch.batch == 0]
 
     @staticmethod
     def epoch_end_metrics(outputs, label: str, stride: int = 1):
         """Compute all metrics at the end of an epoch"""
-        losses = [output["loss"] for output in outputs[::stride]]
+        losses = [
+            output["loss"]
+            for output in outputs[::stride]
+            if output["loss"] is not None and not torch.isnan(output["loss"])
+        ]
         metrics = {
-            f"{label}_loss": torch.tensor(losses).mean().item(),
+            f"{label}_loss": (
+                torch.tensor(losses).mean().item() if losses else float("inf")
+            ),
         }
         return metrics
 
     def training_step(self, batch):
         loss = self.forward(batch, self.train_outputs)
-        # self.log("train_loss", loss)
-        # self.log("learning_rate", self.optimizer.param_groups[0]["lr"])
-        # diff1=batch.pos[batch.batch==1]-batch.pos[batch.batch==0]
-        # diff2=batch.dd[batch.batch==0]
-        # diff1-diff2
+        if loss is None:
+            print("Skipping step due to None loss")
+            return None  # Or return 0 if necessary
         return loss
 
     def on_train_epoch_end(self):
@@ -125,9 +126,10 @@ class LitModel(L.LightningModule):
         self.train_outputs = []
 
     def validation_step(self, batch):
-        # with self.ema.average_parameters():
         loss = self.forward(batch, self.valid_outputs)
-        # self.log("val_loss", loss)
+        if loss is None:
+            print("Skipping step due to None loss")
+            return None  # Or return 0 if necessary
         return loss
 
     def on_validation_epoch_end(self):
