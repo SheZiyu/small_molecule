@@ -65,6 +65,19 @@ class LitData(L.LightningDataModule):
         )
 
 
+def atom_positions_from_mol(rdkit_mol):
+    if rdkit_mol.GetNumConformers() > 0:
+        conformer = rdkit_mol.GetConformer(0)  # Get the first conformer (index 0)
+        # Step 2: Extract coordinates
+        atom_coords = []
+        for atom in rdkit_mol.GetAtoms():
+            pos = conformer.GetAtomPosition(atom.GetIdx())
+            atom_coords.append((pos.x, pos.y, pos.z))
+            atom_coords = torch.tensor(atom_coords)
+    else:
+        print("The molecule does not have any conformers.")
+
+
 class TrajectoryData(Dataset):
     def __init__(
         self, pdb_path, trajectory_path, increments_path, selected_indices=None
@@ -74,12 +87,13 @@ class TrajectoryData(Dataset):
             selected_indices = torch.arange(len(torch.load(trajectory_path)))
         self.trajectory_data = torch.load(trajectory_path)[selected_indices]
         self.increment_data = torch.load(increments_path)[selected_indices]
-        mol = Chem.MolFromPDBFile(pdb_path)
-        self.edge_index, self.edge_type = rdmol_to_edge(mol)
+        mol = Chem.MolFromPDBFile(pdb_path, removeHs=False)
+        self.edge_index, self.edge_type, self.atom_type = rdmol_to_edge(mol)
 
     def __getitem__(self, idx):
         data = Data(
             pos=self.trajectory_data[idx],
+            atom_type=self.atom_type,
             edge_index=self.edge_index,
             edge_type=self.edge_type,
             increments=self.increment_data[idx],

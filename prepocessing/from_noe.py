@@ -37,7 +37,7 @@ def rdmol_to_edge(mol: Mol, include_smiles: bool = False):
         sp.append(1 if hybridization == HybridizationType.SP else 0)
         sp2.append(1 if hybridization == HybridizationType.SP2 else 0)
         sp3.append(1 if hybridization == HybridizationType.SP3 else 0)
-    z = torch.tensor(atomic_number, dtype=torch.long)
+    atomic_number_tensor = torch.tensor(atomic_number, dtype=torch.long)
     row, col, edge_type = [], [], []
     for bond in mol.GetBonds():
         start, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -49,7 +49,7 @@ def rdmol_to_edge(mol: Mol, include_smiles: bool = False):
     perm = (edge_index[0] * N + edge_index[1]).argsort()
     edge_index = edge_index[:, perm]
     edge_type = edge_type[perm]
-    return edge_index, edge_type
+    return edge_index, edge_type,atomic_number_tensor
 
 
 if __name__ == "__main__":

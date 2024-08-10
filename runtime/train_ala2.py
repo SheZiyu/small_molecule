@@ -33,7 +33,9 @@ class InitialCheckpoint(Callback):
         trainer.save_checkpoint(file_name)
 
 
-@hydra.main(config_path="../config/", config_name="diffusion_egnn2", version_base="1.1")
+@hydra.main(
+    config_path="../config/", config_name="flowmatching_egnn", version_base="1.1"
+)
 def main(config):
     # Initialize W&B Run
     wandb.init(
@@ -46,16 +48,16 @@ def main(config):
     first_batch = next(data_iterator)
     # first_batch.pos[first_batch.batch==0]
 
-    model = LitModel(config)
+    model = LitModel(config.train)
     # If resuming, load checkpoint
-    if config.resume_path is not None and config.load_checkpoint is True:
-        model.load_checkpoint(config.resume_path)
+    if config.train.resume_path is not None and config.train.load_checkpoint is True:
+        model.load_checkpoint(config.train.resume_path)
 
     callbacks = [
         LearningRateMonitor(logging_interval="step"),
         ModelCheckpoint(
             dirpath="outputs",
-            monitor="valid_loss" if config.do_validation else None,
+            monitor="valid_loss" if config.train.do_validation else None,
             mode="min",
             save_last=True,
         ),
@@ -64,11 +66,11 @@ def main(config):
     # Create PyTorch Lightning trainer
     trainer = Trainer(
         logger=WandbLogger(project="ala2"),
-        max_epochs=config.num_epochs,
+        max_epochs=config.train.num_epochs,
         accelerator="gpu",
-        devices=config.cuda_ids,
+        devices=config.train.cuda_ids,
         precision=16,
-        accumulate_grad_batches=config.acc_grad_batches,
+        accumulate_grad_batches=config.train.acc_grad_batches,
         callbacks=callbacks,
         # strategy="auto",
         strategy=DDPStrategy(find_unused_parameters=True),

@@ -2,7 +2,7 @@ name: diffusion_egnn
 train:
   pin_memory: true
   num_workers: 5
-  batch_size: 1
+  batch_size: 500
   train_size: 0.7
   num_epochs: 20000
   num_splits: 3  # Number of cross-validation splits
@@ -12,13 +12,14 @@ train:
   patience: 1000
   #cuda_ids: [0,1,2,3,4,5,6]
   #cuda_ids: [0,1,2,3,4]
-  cuda_ids: [5]
+  cuda_ids: [5,6]
   acc_grad_batches: 1
   node_dim: 18
   #edge_type_dim: 4
   cutoff: 2
   scale: 1
   sigma: 0.02 #for flow matching
+  one_hot_atom_dim: 18
   #scale_var: 2
   #num_bins: 20
   #directory_path: 'data/sys'

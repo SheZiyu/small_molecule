@@ -14,8 +14,6 @@ from model.egnn import DynamicsEGNN
 from utils.auxiliary import get_optimizer, subtract_means
 
 
-
-
 # define the LightningModule
 class LitModel(L.LightningModule):
     def __init__(self, config):
@@ -24,9 +22,11 @@ class LitModel(L.LightningModule):
         self.sigma = self.config.sigma
 
         #  Initialize your model, optimizer, scheduler, criterion, etc
-        self.model = DynamicsEGNN(config["node_dim"], 4)
+        self.model = DynamicsEGNN(self.config["node_dim"], 4)
         # self.dpm = DDPM()
-        self.optimizer = optim.Adam(self.model.parameters(), lr=config["learning_rate"])
+        self.optimizer = optim.Adam(
+            self.model.parameters(), lr=self.config["learning_rate"]
+        )
         self.scheduler = lr_scheduler.StepLR(
             self.optimizer, step_size=300, gamma=0.1
         )  # Configure scheduler here
@@ -41,7 +41,7 @@ class LitModel(L.LightningModule):
 
     def forward(self, batch, outputs=None):
         with torch.no_grad():
-            device = batch.x.device
+            device = batch.pos.device
             number_nodes_batch = batch.batch.shape[0]
             position_noise = 0.1 * torch.randn_like(batch.pos)
             current_positions_noised = subtract_means(
@@ -50,7 +50,7 @@ class LitModel(L.LightningModule):
             p0_samples = torch.randn(number_nodes_batch, 3).to(device)
             p0_samples_mean_free = subtract_means(p0_samples, batch.batch)
             p1_samples_mean_free = subtract_means(
-                batch.dd - position_noise, batch.batch
+                batch.increments - position_noise, batch.batch
             )
             time = torch.rand(len(batch), 1).to(device)
             num_nodes_per_graph = torch.bincount(batch.batch)
@@ -67,9 +67,12 @@ class LitModel(L.LightningModule):
                 current_positions_noised + dx_mean_free, batch.batch
             )
             target_vectors = p1_samples_mean_free - p0_samples_mean_free
+        one_hot_atom = torch.nn.functional.one_hot(
+            batch.atom_type, num_classes=self.config.one_hot_atom_dim
+        )
         perturbed_nodes_updated = self.model(
             t=time_repeated,
-            h=batch.x,
+            h=one_hot_atom,
             original_nodes=current_positions_noised,
             perturbed_nodes=perturbed_nodes,
             edge_index=batch.edge_index,
