@@ -7,6 +7,7 @@ from MDAnalysis.coordinates.memory import MemoryReader
 import warnings
 
 warnings.filterwarnings("ignore")
+from omegaconf import OmegaConf
 
 
 def create_trajectory_file(numpy_file_path, pdb_file_path, output_dir):
@@ -66,7 +67,11 @@ if __name__ == "__main__":
     #    "/home/florian/Repos/small_molecule/data/alanine_final_structure_no_water.pdb"
     # )
     # output_dir = "/home/florian/Repos/small_molecule/results/ala"
-    numpy_file_path = "/home/florian/Repos/small_molecule/data/ala2/trajectory.npy"
+    config = OmegaConf.load(
+        "/home/florian/Repos/small_molecule/config/flowmatching_egnn.yaml"
+    )
+    # numpy_file_path = "/home/florian/Repos/small_molecule/data/ala2/trajectory.npy"
+    numpy_file_path = config.inference.output_traj_path
     pdb_file_path = "/home/florian/Repos/small_molecule/data/ala2/ala2.pdb"
-    output_dir = "/home/florian/Repos/small_molecule/results/ala2"
+    output_dir = "/home/florian/Repos/small_molecule/results/ala2_generated"
     create_trajectory_file(numpy_file_path, pdb_file_path, output_dir)

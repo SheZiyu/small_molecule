@@ -1,22 +1,23 @@
-name: diffusion_egnn
+name: flowmatching_egnn
 train:
   pin_memory: true
   num_workers: 10
-  batch_size: 500
+  #batch_size: 500
+  batch_size: 1
   train_size: 0.7
   num_epochs: 20000
   num_splits: 3  # Number of cross-validation splits
   num_frames_to_process: 10000
-  learning_rate: 0.001
+  learning_rate: 0.0002
   decay: 0.995
-  patience: 1000
+  patience: 20
   cuda_ids: [0,1,2,3,4]
   #cuda_ids: [0,1,2,3,4]
   #cuda_ids: [0,1,]
   acc_grad_batches: 1
   node_dim: 18
   #edge_type_dim: 4
-  cutoff: 2
+  cutoff: 14.0
   scale: 1
   sigma: 0.02 #for flow matching
   one_hot_atom_dim: 18
@@ -28,7 +29,13 @@ train:
   repository_location: /home/florian/Repos/small_molecule
   do_validation: false  # Flag to control validation
   #resume_path: /home/florian/Repos/small_molecule/outputs/2024-07-26/13-31-35/outputs/epoch=429-step=3870.ckpt
-  resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/14-48-44/outputs/epoch=9-step=10000.ckpt
+  #resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/14-48-44/outputs/epoch=9-step=10000.ckpt
+  #resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/15-15-16/outputs/1535.ckpt
+  resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/15-15-16/outputs/epoch=496-step=19880.ckpt
+inference:
+  output_traj_path: "/home/florian/Repos/small_molecule/results/trajectory.npy"
+  pdb_path: /home/florian/Repos/small_molecule/results/ala2_generated/output_trajectory.pdb
+  dcd_path: /home/florian/Repos/small_molecule/results/ala2_generated/output_trajectory.dcd
 data:
   pdb_path: "/storage/florian/ziyu_project/ala2/ala2.pdb"
   trajectory_path: "/storage/florian/ziyu_project/ala2/merged_data/trajectory_merged_tensor.pt"

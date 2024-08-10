@@ -22,13 +22,13 @@ class LitModel(L.LightningModule):
         self.sigma = self.config.sigma
 
         #  Initialize your model, optimizer, scheduler, criterion, etc
-        self.model = DynamicsEGNN(self.config["node_dim"], 4)
+        self.model = DynamicsEGNN(self.config["node_dim"], 4, config=config)
         # self.dpm = DDPM()
         self.optimizer = optim.Adam(
             self.model.parameters(), lr=self.config["learning_rate"]
         )
         self.scheduler = lr_scheduler.StepLR(
-            self.optimizer, step_size=300, gamma=0.1
+            self.optimizer, step_size=300, gamma=0.3
         )  # Configure scheduler here
         # self.ema = ExponentialMovingAverage(
         #    self.model.parameters(), decay=config["decay"]

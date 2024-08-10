@@ -22,13 +22,16 @@ class BlackBoxDynamics(torch.nn.Module):
             predicted_vectors: the vector field at time t and location xs
         """
         with torch.no_grad():
-            device = batch.x.device
+            device = batch.pos.device
             time = t * torch.ones(batch.batch.shape[0], 1).to(device)
             x_reshaped = xs[0].reshape((-1, 3))
             perturbed_nodes = batch.pos + x_reshaped
+            one_hot_atom = torch.nn.functional.one_hot(
+                batch.atom_type, num_classes=self.config.train.one_hot_atom_dim
+            )
             perturbed_nodes_updated = self._dynamics_function.model(
                 t=time,
-                h=batch.x,
+                h=one_hot_atom,
                 original_nodes=batch.pos,
                 perturbed_nodes=perturbed_nodes,
                 edge_index=batch.edge_index,

@@ -15,32 +15,34 @@ import numpy as np
 from model.ode import BlackBoxDynamics
 from utils.auxiliary import subtract_means
 import hydra
-from model.egnn_lightning import LitModel, LitData
+from model.egnn_lightning import LitModel
+from data_loading.data_loader import create_dataloaders
 
 # def generate_trajectory_original_data()
 
 
-@hydra.main(config_path="../config/", config_name="diffusion_egnn", version_base="1.1")
+@hydra.main(
+    config_path="../config/", config_name="flowmatching_egnn", version_base="1.1"
+)
 def main(config):
-    datamodule = LitData(config)
-    train_dataloader = datamodule.train_dataloader()
+    train_loader = create_dataloaders(config)
     # extract first element:
-    data_iterator = iter(train_dataloader)
+    data_iterator = iter(train_loader)
     first_batch = next(data_iterator)
-    device = first_batch.x.device
-    model = LitModel(config)
+    device = first_batch.pos.device
+    model = LitModel(config.train)
     # Load checkpoint
-    model.load_checkpoint(config.resume_path)
+    model.load_checkpoint(config.train.resume_path)
     ###########################################################################################
     number_nodes_batch = first_batch.batch.shape[0]
     t_max = 1.0
-    n_time_steps = 5
+    n_time_steps = 10
     ts = torch.linspace(0.0, t_max, n_time_steps).to(device)
     rtol = 1e-7
     atol = 1e-9
     method = "euler"
     trajectory = []
-    traj_len = 5000
+    traj_len = 10000
     bb_dynamics = BlackBoxDynamics(model, config)
     start_time = time.time()
     for ind in tqdm(range(traj_len), desc="Generating Trajectory"):
@@ -66,7 +68,8 @@ def main(config):
     execution_time = end_time - start_time
     print(f"Execution time: {execution_time} seconds")
     trajectory_np = np.array(trajectory)
-    np.save("/home/florian/Repos/small_molecule/results/trajectory.npy", trajectory_np)
+    # np.save("/home/florian/Repos/small_molecule/results/trajectory.npy", trajectory_np)
+    np.save(config.inference.output_traj_path, trajectory_np)
 
 
 if __name__ == "__main__":

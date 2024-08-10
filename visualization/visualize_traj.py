@@ -1,19 +1,25 @@
 import os
 import pymol
 from pymol import cmd
+from omegaconf import OmegaConf
 
 # Start PyMOL
 pymol.finish_launching()
 
+
+config = OmegaConf.load(
+    "/home/florian/Repos/small_molecule/config/flowmatching_egnn.yaml"
+)
 # Define the base path
-base_path = "/storage/florian/ziyu_project/ala2"
+# base_path = "/storage/florian/ziyu_project/ala2"
+# base_path = "/storage/florian/ziyu_project/ala2"
 
 # Load the topology file (PDB)
-pdb_path = os.path.join(base_path, "ala2.pdb")
+pdb_path = os.path.join(config.inference.pdb_path)
 cmd.load(pdb_path, "ala2")
 
 # Load the trajectory file (DCD) into the existing topology
-dcd_path = os.path.join(base_path, "trajectory-0.dcd")
+dcd_path = os.path.join(config.inference.dcd_path)
 cmd.load_traj(dcd_path, "ala2")
 
 # Center the view on the molecule
