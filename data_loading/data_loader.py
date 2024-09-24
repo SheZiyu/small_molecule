@@ -104,16 +104,16 @@ class TrajectoryData(Dataset):
         return len(self.trajectory_data)
 
 
-def create_dataloaders(config: DictConfig):
+def create_dataloaders(config_data: DictConfig, config_data_loader: DictConfig):
     training_set = TrajectoryData(
-        config.data.pdb_path,
-        config.data.trajectory_path,
-        config.data.increments_path,
+        config_data.pdb_path,
+        config_data.trajectory_path,
+        config_data.increments_path,
     )
     train_loader_kwargs = {
-        "batch_size": config.train.batch_size,
-        "num_workers": config.train.num_workers,
-        "pin_memory": config.train.pin_memory,
+        "batch_size": config_data_loader.batch_size,
+        "num_workers": config_data_loader.num_workers,
+        "pin_memory": config_data_loader.pin_memory,
     }
     train_dataloader = PGDataLoader(
         dataset=training_set, shuffle=True, **train_loader_kwargs

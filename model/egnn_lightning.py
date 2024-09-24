@@ -43,7 +43,7 @@ class LitModel(L.LightningModule):
         with torch.no_grad():
             device = batch.pos.device
             number_nodes_batch = batch.batch.shape[0]
-            position_noise = 0.1 * torch.randn_like(batch.pos)
+            position_noise = self.config.position_noise * torch.randn_like(batch.pos)
             current_positions_noised = subtract_means(
                 batch.pos + position_noise, batch.batch
             )

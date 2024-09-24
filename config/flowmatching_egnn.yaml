@@ -2,22 +2,24 @@ name: flowmatching_egnn
 train:
   pin_memory: true
   num_workers: 10
-  #batch_size: 500
-  batch_size: 1
+  batch_size: 450
+  #batch_size: 1
   train_size: 0.7
   num_epochs: 20000
   num_splits: 3  # Number of cross-validation splits
   num_frames_to_process: 10000
-  learning_rate: 0.0002
+  learning_rate: 0.001
   decay: 0.995
   patience: 20
   cuda_ids: [0,1,2,3,4]
+  #cuda_ids: [5]
+  position_noise: 0.5
   #cuda_ids: [0,1,2,3,4]
   #cuda_ids: [0,1,]
   acc_grad_batches: 1
   node_dim: 18
   #edge_type_dim: 4
-  cutoff: 14.0
+  cutoff: 6.0
   scale: 1
   sigma: 0.02 #for flow matching
   one_hot_atom_dim: 18
@@ -31,8 +33,15 @@ train:
   #resume_path: /home/florian/Repos/small_molecule/outputs/2024-07-26/13-31-35/outputs/epoch=429-step=3870.ckpt
   #resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/14-48-44/outputs/epoch=9-step=10000.ckpt
   #resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/15-15-16/outputs/1535.ckpt
-  resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/15-15-16/outputs/epoch=496-step=19880.ckpt
+  #resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/15-15-16/outputs/epoch=496-step=19880.ckpt
+  #resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/18-45-15/outputs/last.ckpt
+  resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/18-45-15/outputs/good.ckpt
+  #resume_path: /home/florian/Repos/small_molecule/outputs/2024-08-10/17-59-23/outputs/epoch=266-step=12015.ckpt
 inference:
+  num_workers: 1
+  batch_size: 1
+  pin_memory: true
+  device: 5
   output_traj_path: "/home/florian/Repos/small_molecule/results/trajectory.npy"
   pdb_path: /home/florian/Repos/small_molecule/results/ala2_generated/output_trajectory.pdb
   dcd_path: /home/florian/Repos/small_molecule/results/ala2_generated/output_trajectory.dcd

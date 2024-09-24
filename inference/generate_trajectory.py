@@ -18,19 +18,18 @@ import hydra
 from model.egnn_lightning import LitModel
 from data_loading.data_loader import create_dataloaders
 
-# def generate_trajectory_original_data()
-
 
 @hydra.main(
     config_path="../config/", config_name="flowmatching_egnn", version_base="1.1"
 )
 def main(config):
-    train_loader = create_dataloaders(config)
+    device = config.inference.device
+    # device = "cpu"
+    train_loader = create_dataloaders(config.data, config.inference)
     # extract first element:
     data_iterator = iter(train_loader)
-    first_batch = next(data_iterator)
-    device = first_batch.pos.device
-    model = LitModel(config.train)
+    first_batch = next(data_iterator).to(device)
+    model = LitModel(config.train).to(device)
     # Load checkpoint
     model.load_checkpoint(config.train.resume_path)
     ###########################################################################################
@@ -40,13 +39,18 @@ def main(config):
     ts = torch.linspace(0.0, t_max, n_time_steps).to(device)
     rtol = 1e-7
     atol = 1e-9
+    # rtol = 1e-5
+    # atol = 1e-7
     method = "euler"
+    # method = "fehlberg2"
     trajectory = []
-    traj_len = 10000
+    traj_len = 40000
     bb_dynamics = BlackBoxDynamics(model, config)
     start_time = time.time()
     for ind in tqdm(range(traj_len), desc="Generating Trajectory"):
-        trajectory.append(subtract_means(first_batch.pos, first_batch.batch))
+        trajectory.append(
+            subtract_means(first_batch.pos, first_batch.batch).detach().cpu()
+        )
         bb_dynamics.forward = partial(bb_dynamics.forward, batch=first_batch)
         noise = torch.randn(number_nodes_batch, 3).to(device)
         noise_mean_free = subtract_means(noise, first_batch.batch)
@@ -68,7 +72,6 @@ def main(config):
     execution_time = end_time - start_time
     print(f"Execution time: {execution_time} seconds")
     trajectory_np = np.array(trajectory)
-    # np.save("/home/florian/Repos/small_molecule/results/trajectory.npy", trajectory_np)
     np.save(config.inference.output_traj_path, trajectory_np)
 
 

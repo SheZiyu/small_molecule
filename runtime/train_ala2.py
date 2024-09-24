@@ -43,7 +43,7 @@ def main(config):
         config=OmegaConf.to_container(config),
         reinit=True,
     )
-    train_loader = create_dataloaders(config)
+    train_loader = create_dataloaders(config.data, config.train)
     data_iterator = iter(train_loader)
     first_batch = next(data_iterator)
     # first_batch.pos[first_batch.batch==0]
